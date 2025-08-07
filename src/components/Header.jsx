@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/AuthProvider"; // assumes you have a user context
 import { supabase } from "@/lib/supabaseClient";
+import { LogOut } from "lucide-react";
 
 export default function Header({ children }) {
   const router = useRouter();
@@ -41,9 +42,9 @@ export default function Header({ children }) {
 
       <button
         onClick={handleLogout}
-        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
       >
-        Logout
+        <LogOut className="w-6 h-6" />
+
       </button>
 
       {children}
