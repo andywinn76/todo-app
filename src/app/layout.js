@@ -4,7 +4,7 @@ import ConditionalHeader from "@/components/ConditionalHeader";
 import { Toaster } from "sonner";
 
 export const metadata = {
-  title: "ToDo App",
+  title: "Lets Doooo It",
 };
 
 export default function RootLayout({ children }) {

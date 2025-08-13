@@ -2,9 +2,7 @@
 import { useEffect, useState } from "react";
 import { fetchTodos, toggleTodo, updateTodo, deleteTodo } from "@/lib/todos";
 import { toast } from "sonner";
-import { FaTrashAlt } from "react-icons/fa";
-import { FaPencilAlt } from "react-icons/fa";
-import { FaCheck, FaTimes } from "react-icons/fa";
+import { FaTrashAlt, FaPencilAlt, FaCheck, FaTimes } from "react-icons/fa";
 
 export default function TodoList({ user, todos, onRefresh }) {
   const userId = user?.id;
@@ -52,69 +50,107 @@ export default function TodoList({ user, todos, onRefresh }) {
 
   return (
     <ul className="space-y-2">
-      {todos.map((todo) => (
-        <li
-          key={todo.id}
-          className={`p-2 border rounded flex items-center gap-2 ${
-            todo.completed ? "bg-green-100" : "bg-orange-50"
-          }`}
-        >
-          <input
-            type="checkbox"
-            checked={todo.completed}
-            onChange={() => handleToggle(todo.id, todo.completed)}
-          />
+      {todos.map((todo) => {
+        const isEditing = editingId === todo.id;
+        return (
+          <li
+            key={todo.id}
+            className={`p-2 border rounded flex flex-wrap items-center gap-2 ${
+              todo.completed ? "bg-green-100" : "bg-orange-50"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={todo.completed}
+              onChange={() => handleToggle(todo.id, todo.completed)}
+              className="flex-none disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label={
+                todo.completed ? "Mark as not completed" : "Mark as completed"
+              }
+              disabled={editingId === todo.id}
+            />
 
-          {editingId === todo.id ? (
-            <>
-              <input
-                className="flex-1 border p-1"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-              />
-              <select
-                value={editPriority}
-                onChange={(e) => setEditPriority(e.target.value)}
-                className="border p-1"
-              >
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-              </select>
-              <button onClick={() => handleSave(todo.id)} title="Save">
-                <FaCheck />
-              </button>
-              <button onClick={() => setEditingId(null)} title="Cancel">
-                <FaTimes />
-              </button>
-            </>
-          ) : (
-            <>
-              <span
-                className={`flex-1 ${todo.completed ? "line-through" : ""}`}
-              >
-                {todo.title}
-              </span>
-              <span className="text-sm text-gray-500 capitalize">
-                ({todo.priority})
-              </span>
-              <button
-                onClick={() => {
-                  setEditingId(todo.id);
-                  setEditTitle(todo.title);
-                  setEditPriority(todo.priority);
-                }}
-                title="Edit"
-              >
-                <FaPencilAlt />
-              </button>
-              <button onClick={() => handleDelete(todo.id)} title="Delete">
-                <FaTrashAlt />
-              </button>
-            </>
-          )}
-        </li>
-      ))}
+            {editingId === todo.id ? (
+              // EDITING LAYOUT
+              <div className="w-full md:w-auto flex-1 min-w-0 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <input
+                  className="min-w-0 flex-1 w-full border p-2 rounded"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Edit title"
+                />
+
+                <select
+                  value={editPriority}
+                  onChange={(e) => setEditPriority(e.target.value)}
+                  className="w-full sm:w-40 border p-2 rounded"
+                >
+                  <option value="low">low</option>
+                  <option value="medium">medium</option>
+                  <option value="high">high</option>
+                </select>
+
+                <div className="flex w-full sm:w-auto gap-2 justify-end sm:justify-start">
+                  <button
+                    className="p-2 rounded hover:bg-gray-200"
+                    onClick={() => handleSave(todo.id)}
+                    title="Save"
+                    aria-label="Save"
+                  >
+                    <FaCheck />
+                  </button>
+                  <button
+                    className="p-2 rounded hover:bg-gray-200"
+                    onClick={() => setEditingId(null)}
+                    title="Cancel"
+                    aria-label="Cancel"
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // READ-ONLY LAYOUT
+              <div className="w-full md:w-auto flex-1 min-w-0 flex flex-wrap items-center gap-2">
+                <span
+                  className={`min-w-0 flex-1 ${
+                    todo.completed ? "line-through" : ""
+                  }`}
+                >
+                  {todo.title}
+                </span>
+
+                <span className="text-sm text-gray-500 capitalize">
+                  ( {todo.priority} )
+                </span>
+
+                <div className="flex gap-2 ml-auto">
+                  <button
+                    onClick={() => {
+                      setEditingId(todo.id);
+                      setEditTitle(todo.title);
+                      setEditPriority(todo.priority);
+                    }}
+                    title="Edit"
+                    className="p-2 rounded hover:bg-gray-200"
+                    aria-label="Edit"
+                  >
+                    <FaPencilAlt />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(todo.id)}
+                    title="Delete"
+                    className="p-2 rounded hover:bg-gray-200"
+                    aria-label="Delete"
+                  >
+                    <FaTrashAlt />
+                  </button>
+                </div>
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

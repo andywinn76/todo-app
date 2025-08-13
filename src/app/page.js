@@ -44,7 +44,7 @@ export default function Home() {
         </button>
       </div>
 
-      {isActive && <TodoForm user={user} onTodoAdded={fetchTodos} />}
+      {isActive && <TodoForm user={user} onTodoAdded={fetchTodos} isActive={isActive} setIsActive={setIsActive}/>}
 
       <TodoList user={user} todos={todos} onRefresh={fetchTodos} />
     </main>

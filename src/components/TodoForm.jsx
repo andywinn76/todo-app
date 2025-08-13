@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { createTodo } from "@/lib/todos";
 
-export default function TodoForm({ user, onTodoAdded }) {
+export default function TodoForm({ user, onTodoAdded, isActive, setIsActive }) {
   const userId = user?.id;
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("medium");
@@ -45,6 +45,7 @@ export default function TodoForm({ user, onTodoAdded }) {
       setPriority("medium");
       setDueDate("");
       setDescription("");
+      setIsActive(false); // close the form after adding
       onTodoAdded?.(); // optional callback to refresh list
     }
   };
