@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useUser } from "@/components/AuthProvider"; // assumes you have a user context
+import { useUser } from "@/components/AuthProvider"; 
 import { supabase } from "@/lib/supabaseClient";
 import { LogOut } from "lucide-react";
-import Logo from "./Logo";
+import Logo from "./Logo"; 
 
 export default function Header({ children }) {
   const router = useRouter();
@@ -34,7 +34,7 @@ export default function Header({ children }) {
 
   return (
     <header className="flex items-center justify-between bg-gray-100 p-4 border-b">
-      <Logo />
+      <Logo type="responsive" size="header" className="ml-2 sm:ml-4" priority />
       <div className="flex items-center gap-2 sm:gap-4">
         <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg">
           {initials}

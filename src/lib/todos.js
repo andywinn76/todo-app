@@ -1,16 +1,16 @@
 import { supabase } from "./supabaseClient";
 
-export async function fetchTodos(userId) {
+export async function fetchTodos(listId) {
   const { data, error } = await supabase
     .from("todos")
     .select("*")
-    .eq("created_by", userId)
+    .eq("list_id", listId)
     .order("created_at", { ascending: false });
 
   return { data, error };
 }
 
-export async function createTodo({ title, description, due_date, priority, userId }) {
+export async function createTodo({ title, description, due_date, priority, userId, listId }) {
   const { data, error } = await supabase.from("todos").insert([
     {
       title,
@@ -18,6 +18,7 @@ export async function createTodo({ title, description, due_date, priority, userI
       due_date,
       priority,
       created_by: userId,
+      list_id: listId,
     },
   ]);
   return { data, error };

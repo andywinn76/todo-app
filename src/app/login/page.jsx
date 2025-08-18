@@ -3,11 +3,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import Logo from "@/components/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -21,6 +23,7 @@ export default function LoginPage() {
       ? await supabase.auth.signUp({
           email,
           password,
+          username,
           options: {
             data: {
               first_name: firstName,
@@ -40,7 +43,8 @@ export default function LoginPage() {
 
   return (
     <main className="max-w-md mx-auto mt-20 p-6 border rounded-xl shadow">
-      <h1 className="text-3xl font-bold mb-4 ">Welcome to Your ToDo List!</h1>
+      <Logo type="static" size={200} className="mx-auto mb-6 rounded-2xl" priority />
+      <h1 className="text-3xl font-bold mb-4 ">Welcome to Let's Doooo It!</h1>
       <p className="mx-14 text-blue-600 text-center mb-6">
         To get started, either login or sign-up using the form below.
       </p>
@@ -64,6 +68,14 @@ export default function LoginPage() {
               className="w-full border px-3 py-2 rounded"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
+              required
+            />
+            <input
+              type="text"
+              placeholder="Username"
+              className="w-full border px-3 py-2 rounded"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
             />
           </>

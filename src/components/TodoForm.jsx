@@ -4,38 +4,44 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { createTodo } from "@/lib/todos";
 
-export default function TodoForm({ user, onTodoAdded, isActive, setIsActive }) {
+export default function TodoForm({ user, listId, onTodoAdded, isActive, setIsActive }) {
   const userId = user?.id;
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState("");
   const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!listId) {
+      toast.error("Select or create a list first");
+      return;
+    }
     if (!title.trim()) {
       toast.error("Title is required");
       return;
     }
-
     if (!priority) {
       toast.error("Priority must be selected");
       return;
     }
-
     if (!dueDate) {
       toast.error("Due date is required");
       return;
     }
 
+    setSaving(true);
     const { error } = await createTodo({
       title,
       description,
       due_date: dueDate,
       priority,
       userId,
+      listId,              // ← add this
     });
+    setSaving(false);
 
     if (error) {
       toast.error("Failed to add todo");
@@ -45,8 +51,8 @@ export default function TodoForm({ user, onTodoAdded, isActive, setIsActive }) {
       setPriority("medium");
       setDueDate("");
       setDescription("");
-      setIsActive(false); // close the form after adding
-      onTodoAdded?.(); // optional callback to refresh list
+      setIsActive(false);      // close the form after adding
+      onTodoAdded?.();         // refresh list
     }
   };
 
@@ -99,9 +105,13 @@ export default function TodoForm({ user, onTodoAdded, isActive, setIsActive }) {
 
       <button
         type="submit"
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        disabled={saving || !listId}
+        title={!listId ? "Select or create a list first" : ""}
+        className={`${
+          saving ? "opacity-75 cursor-not-allowed" : ""
+        } bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700`}
       >
-        Add Todo
+        {saving ? "Adding..." : "Add Todo"}
       </button>
     </form>
   );
