@@ -4,20 +4,19 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import ManageListsDrawer from "@/components/ManageListsDrawer";
 
-export default function ListSelector({ user, activeListId, onSelect, onListsChange }) {
+export default function ListSelector({ user, activeListId, onSelect }) {
   const [lists, setLists] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
-  const manageBtnRef = useRef(null);
   const inputRef = useRef(null);
 
   async function refreshLists() {
     if (!user) return [];
     const { data, error } = await supabase
-      .from("lists_with_owner")
-      .select("id, name, created_at, owner_first_name, owner_last_name")
+      .from("lists")
+      .select("id, name, created_at")
       .eq("created_by", user.id)
       .order("created_at", { ascending: false });
 
@@ -27,7 +26,6 @@ export default function ListSelector({ user, activeListId, onSelect, onListsChan
       return [];
     }
     setLists(data || []);
-    onListsChange?.(data || []);
     return data || [];
   }
 
@@ -35,7 +33,7 @@ export default function ListSelector({ user, activeListId, onSelect, onListsChan
     if (!user) return;
     (async () => {
       const data = await refreshLists();
-      // if (typeof activeListId === "undefined" && data.length) onSelect(String(data[0].id));
+      if (!activeListId && data.length) onSelect(data[0].id);
     })();
   }, [user]);
 
@@ -91,8 +89,8 @@ export default function ListSelector({ user, activeListId, onSelect, onListsChan
         <label className="text-sm font-medium">List:</label>
         <div className="flex items-center gap-2">
           <select
-            value={activeListId ?? ""} 
-            onChange={(e) => {const v = e.target.value; onSelect(v === "" ? null : String(v));}}
+            value={activeListId || ""}
+            onChange={(e) => onSelect(e.target.value)}
             className="border rounded px-2 py-1 min-w-[12rem]"
           >
             {lists.map((l) => (
@@ -102,6 +100,14 @@ export default function ListSelector({ user, activeListId, onSelect, onListsChan
             ))}
           </select>
 
+          {!showForm && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-green-500 hover:bg-green-600 text-white text-sm font-semibold px-3 py-1 rounded"
+            >
+              + New
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setManageOpen(true)}
@@ -155,11 +161,6 @@ export default function ListSelector({ user, activeListId, onSelect, onListsChan
         onClose={() => setManageOpen(false)}
         user={user}
         lists={lists}
-        triggerRef={manageBtnRef}
-        onAfterCreate={async (created) => {
-          const updated = await refreshLists(); //Select the new list
-          if (created?.id) onSelect(created.id);
-        }}
         onAfterDelete={async (deletedId) => {
           // Refresh lists after deletion
           const updated = await refreshLists(); // If the deleted list was selected, pick the newest remaining; otherwise keep current selection
