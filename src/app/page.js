@@ -1,17 +1,20 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState } from "react"; // ⬅ add useLayoutEffect
+import { useEffect, useLayoutEffect, useState } from "react"; // ⬅ add useLayoutEffect
 import { supabase } from "@/lib/supabaseClient";
 import useRequireAuth from "@/hooks/useRequireAuth";
 import TodoForm from "@/components/TodoForm";
 import TodoList from "@/components/TodoList";
 import ListSelector from "@/components/ListSelector";
+import ShareListInline from "@/components/ShareListInline";
 
 export default function Home() {
   const [todos, setTodos] = useState([]);
-  const { user, userLoading } = useRequireAuth();
+  const {user, userLoading } = useRequireAuth();
   const [isActive, setIsActive] = useState(false);
   const [activeListId, setActiveListId] = useState(undefined);
   const [lists, setLists] = useState([]);
+
+  const [shareOpen, setShareOpen] = useState(false);
 
   const storageKey = user ? `lastListId:${user.id}` : null;
 
@@ -74,22 +77,22 @@ export default function Home() {
     lists.some((l) => String(l.id) === String(activeListId));
 
   const fetchTodos = async () => {
-  if (!user || !hasValidActive) {
-    setTodos([]);
-    return;
-  }
-  const { data, error } = await supabase
-    .from("todos")
-    .select("*")
-    .eq("list_id", String(activeListId))
-    .order("due_date", { ascending: true });
+    if (!user || !hasValidActive) {
+      setTodos([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("todos")
+      .select("*")
+      .eq("list_id", String(activeListId))
+      .order("due_date", { ascending: true });
 
-  if (error) {
-    console.error("Error:", error);
-  } else {
-    setTodos(data || []);
-  }
-};
+    if (error) {
+      console.error("Error:", error);
+    } else {
+      setTodos(data || []);
+    }
+  };
 
   const activeListName = (() => {
     if (!lists.length) return "Click Manage to Add a List";
@@ -98,13 +101,13 @@ export default function Home() {
   })();
 
   useEffect(() => {
-  if (!user) return;
-  if (!hasValidActive) {
-    setTodos([]);
-    return;
-  }
-  fetchTodos();
-}, [user, activeListId, lists]);
+    if (!user) return;
+    if (!hasValidActive) {
+      setTodos([]);
+      return;
+    }
+    fetchTodos();
+  }, [user, activeListId, lists]);
 
   const handleSetActive = () => setIsActive(!isActive);
 
@@ -114,28 +117,45 @@ export default function Home() {
     <main className="p-6">
       <ListSelector
         user={user}
+        lists={lists}
+        setLists={setLists}
         activeListId={activeListId}
         onSelect={handleSelectList} /* ⬅ use the persistence-aware setter */
         onListsChange={setLists}
       />
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">{activeListName}</h1>
-          {lists.length > 0 && ownerLabel && (
-            <p className="text-sm text-gray-500 mt-1">{ownerLabel}</p>
-          )}
-        </div>
-        <button
-          className={`${
-            isActive
-              ? "bg-red-400 hover:bg-red-500"
-              : "bg-green-400 hover:bg-green-600"
-          } text-white font-semibold py-2 px-4 rounded`}
-          onClick={handleSetActive}
-        >
-          {isActive ? "Cancel" : "Add Todo"}
-        </button>
-      </div>
+        <div className="min-w-0">
+  <div className="flex items-center gap-2">
+    <h1 className="text-2xl font-bold truncate">{activeListName}</h1>
+
+    {activeListId && (
+      <ShareListInline
+        listId={activeListId}
+        currentUserId={user.id}
+        isOpen={shareOpen}
+        onOpenChange={setShareOpen}
+        render="trigger"              // icon-only next to the title
+      />
+    )}
+  </div>
+
+  {/* Inline form appears here when open, without wrecking the title spacing */}
+  {activeListId && (
+    <ShareListInline
+      listId={activeListId}
+      currentUserId={user.id}
+      isOpen={shareOpen}
+      onOpenChange={setShareOpen}
+      onDone={() => setShareOpen(false)}
+      render="form-below"             // stacks under the title
+    />
+  )}
+
+  {lists.length > 0 && ownerLabel && (
+    <p className="text-sm text-gray-500 mt-1 truncate">{ownerLabel}</p>
+  )}
+</div>
+</div>
 
       {isActive && activeListId && (
         <TodoForm

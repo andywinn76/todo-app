@@ -25,7 +25,6 @@ export default function ManageListsDrawer({
   const [createdThisSession, setCreatedThisSession] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
-
   const panelRef = useRef(null);
   const focusStartRef = useRef(null);
   const createInputRef = useRef(null);
@@ -37,18 +36,13 @@ export default function ManageListsDrawer({
   const [unsubscribingId, setUnsubscribingId] = useState(null);
   const [confirmUnsubId, setConfirmUnsubId] = useState(null);
 
-  // Helper: is the current user the owner of this list?
+  // Unsubscribe helper: determine if the current user owns a given list
   function isOwner(list) {
-    // Your rows already include created_by; prefer that.
-    if (list?.created_by) return list.created_by === user.id;
-    // Fallback if your query hydrates role:
-    if (list?._role) return list._role === "owner";
+    // prefer role if you already include it in your lists query
+    if (list.role) return list.role === "owner";
+    // fallback if you have owner_id on the list row
+    if (list.owner_id) return list.owner_id === user.id;
     return false;
-  }
-
-  // Helper: can the current user unsubscribe from this list?
-  function canUnsubscribe(list) {
-    return !isOwner(list);
   }
 
   // Focus trap + esc + body scroll lock
@@ -108,8 +102,6 @@ export default function ManageListsDrawer({
     setShareOpenId(null);
     setDeletingId(null);
     setConfirmId(null);
-    setConfirmUnsubId(null);
-    setUnsubscribingId(null);
   }, [open]);
 
   function handleClose() {
@@ -182,7 +174,7 @@ export default function ManageListsDrawer({
     await onAfterDelete?.(list.id);
   }
 
-  // Owner display helper
+  //Helper to get owner label
   function ownerLabelFor(list, user) {
     if (!list) return "—";
     if (list.created_by === user.id) return "Me";
@@ -202,36 +194,19 @@ export default function ManageListsDrawer({
     return "—";
   }
 
-  // Unsubscribe handler
   async function handleUnsubscribe(listId, userId) {
-    try {
-      setBusy(true);
-      setUnsubscribingId(listId);
+    const { error } = await supabase
+      .from("list_members")
+      .delete()
+      .eq("list_id", listId)
+      .eq("user_id", userId);
 
-      const { error } = await supabase
-        .from("list_members")
-        .delete()
-        .eq("list_id", listId)
-        .eq("user_id", userId);
-
-      if (error) {
-        console.error(error);
-        toast.error("Could not unsubscribe. Please try again.");
-        return;
-      }
-
-      toast.success("You left the list.");
-      setConfirmUnsubId(null);
-      setUnsubscribingId(null);
-
-      // Update parent (remove from local lists, maybe reset active)
-      await onAfterDelete?.(listId);
-
-      // Optional: close the drawer after success
-      handleClose();
-    } finally {
-      setBusy(false);
-      setUnsubscribingId(null);
+    if (error) {
+      toast.error("Error unsubscribing");
+    } else {
+      toast.success("You’ve unsubscribed from this list");
+      // Refresh lists
+      onAfterDelete(listId);
     }
   }
 
@@ -334,7 +309,7 @@ export default function ManageListsDrawer({
           )}
 
           {lists.map((list) => {
-            const isConfirmingDelete = confirmId === list.id;
+            const isConfirming = confirmId === list.id;
             const isDeleting = deletingId === list.id && busy;
             const inviting = shareOpenId === list.id;
             const canInvite =
@@ -345,7 +320,9 @@ export default function ManageListsDrawer({
                 {/* Row header */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className={`font-medium ${inviting ? "" : "truncate"}`}>
+                    <div
+                      className={`font-medium ${inviting ? "" : "truncate"}`}
+                    >
                       {list.name || "Untitled"}
                     </div>
                     <div className="text-xs text-gray-500">
@@ -354,12 +331,11 @@ export default function ManageListsDrawer({
                   </div>
 
                   {/* Actions */}
-                  {!isConfirmingDelete ? (
+                  {!isConfirming ? (
                     <div className="flex items-center gap-2 shrink-0">
-                      {/* Hide other actions while inviting */}
+                      {/* Hide Rename/Delete when inviting; show only trigger next to name (form is below) */}
                       {!inviting && (
                         <>
-                          {/* (Disabled) Rename icon placeholder */}
                           <button
                             type="button"
                             disabled={busy || creating}
@@ -370,44 +346,29 @@ export default function ManageListsDrawer({
                             <FaPencilAlt className="w-5 h-5" />
                           </button>
 
-                          {/* Owners: Share + Delete / Members: Unsubscribe */}
-                          {isOwner(list) ? (
-                            <>
-                              {canInvite && (
-                                <ShareListInline
-                                  listId={list.id}
-                                  currentUserId={user.id}
-                                  isOpen={inviting}
-                                  onOpenChange={(open) =>
-                                    setShareOpenId(open ? list.id : null)
-                                  }
-                                  render="trigger"
-                                />
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => setConfirmId(list.id)}
-                                disabled={busy || creating}
-                                className="text-sm px-2 py-1 text-red-600 hover:bg-red-50"
-                                aria-label={`Delete list ${list.name || "Untitled"}`}
-                                title="Delete list"
-                              >
-                                <FaTrashAlt className="w-5 h-5" />
-                              </button>
-                            </>
-                          ) : (
-                            // Non-owners: Unsubscribe
-                            <button
-                              type="button"
-                              onClick={() => setConfirmUnsubId(list.id)}
-                              disabled={busy || unsubscribingId === list.id}
-                              className="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-                              aria-label={`Unsubscribe from ${list.name || "Untitled"}`}
-                              title="Leave this list"
-                            >
-                              {unsubscribingId === list.id ? "Leaving…" : "Unsubscribe"}
-                            </button>
+                          {canInvite && (
+                            <ShareListInline
+                              listId={list.id}
+                              currentUserId={user.id}
+                              isOpen={inviting}
+                              onOpenChange={(open) =>
+                                setShareOpenId(open ? list.id : null)
+                              }
+                              render="trigger" // icon-only
+                            />
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => setConfirmId(list.id)}
+                            disabled={busy || creating}
+                            className="text-sm px-2 py-1 text-red-600 hover:bg-red-50"
+                            aria-label={`Delete list ${
+                              list.name || "Untitled"
+                            }`}
+                          >
+                            <FaTrashAlt className="w-5 h-5" />
+                          </button>
                         </>
                       )}
 
@@ -425,7 +386,6 @@ export default function ManageListsDrawer({
                       )}
                     </div>
                   ) : (
-                    // Owner delete confirmation
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -454,34 +414,6 @@ export default function ManageListsDrawer({
                     </div>
                   )}
                 </div>
-
-                {/* Unsubscribe confirm (non-owner only) */}
-                {confirmUnsubId === list.id && canUnsubscribe(list) && (
-                  <div className="mt-2 p-3 rounded border bg-amber-50">
-                    <p className="text-center  mb-2 text-md font-bold">
-                      ⚠️ Leave “{list.name || "Untitled"}”? 
-                    </p>
-                    <p className="text-center text-xs mb-2 pb-2">(You'll lose access to its items until re-invited.) </p>
-                    <div className="flex gap-2 text-center justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setConfirmUnsubId(null)}
-                        disabled={busy}
-                        className="px-3 py-1 rounded border hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleUnsubscribe(list.id, user.id)}
-                        disabled={busy}
-                        className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {unsubscribingId === list.id ? "Leaving…" : "Confirm Unsubscribe"}
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 {/* Invite form below the row (appears only when inviting) */}
                 {inviting && canInvite && (

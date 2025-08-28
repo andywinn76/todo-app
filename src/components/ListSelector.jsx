@@ -4,8 +4,15 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import ManageListsDrawer from "@/components/ManageListsDrawer";
 
-export default function ListSelector({ user, activeListId, onSelect, onListsChange }) {
-  const [lists, setLists] = useState([]);
+export default function ListSelector({
+  user,
+  activeListId,
+  onSelect,
+  onListsChange,
+  lists,
+  setLists,
+}) {
+  // const [lists, setLists] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -15,20 +22,75 @@ export default function ListSelector({ user, activeListId, onSelect, onListsChan
 
   async function refreshLists() {
     if (!user) return [];
+
     const { data, error } = await supabase
-      .from("lists_with_owner")
-      .select("id, name, created_at, owner_first_name, owner_last_name")
-      .eq("created_by", user.id)
-      .order("created_at", { ascending: false });
+      .from("list_members")
+      .select(
+        `
+  role,
+  lists:lists(id, name, created_at, created_by)
+`
+      )
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true, foreignTable: "lists" }); // <-- key fix
+      console.log('rows sample', (data||[])[0]);
 
     if (error) {
-      console.error("load my lists error:", error);
+      console.error(
+        "load my lists error:",
+        error.message,
+        error.details,
+        error.hint
+      );
       toast.error("Error loading lists");
       return [];
     }
-    setLists(data || []);
-    onListsChange?.(data || []);
-    return data || [];
+
+    // const rows = data || [];
+    // const transformed = rows.map((row) => ({ ...row.lists, _role: row.role }));
+    const rows = data || [];
+    const transformed = rows.map(({ role, lists }) => ({
+      ...lists,
+      _role: role,
+      owner_first_name: lists?.owner?.first_name ?? null,
+      owner_last_name: lists?.owner?.last_name ?? null,
+      owner_username: lists?.owner?.username ?? null,
+    }));
+    // collect unique owner ids
+    const ownerIds = [
+      ...new Set(transformed.map((l) => l.created_by).filter(Boolean)),
+    ];
+
+    let ownersById = {};
+    if (ownerIds.length) {
+      const { data: owners, error: ownersErr } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, username")
+        .in("id", ownerIds);
+
+      if (!ownersErr && owners) {
+        ownersById = Object.fromEntries(owners.map((o) => [o.id, o]));
+      }
+    }
+
+    // enrich each list with owner fields (if available)
+    const enriched = transformed.map((l) => {
+      const o = ownersById[l.created_by] || {};
+      return {
+        ...l,
+        owner_first_name: o.first_name ?? null,
+        owner_last_name: o.last_name ?? null,
+        owner_username: o.username ?? null,
+      };
+    });
+
+    setLists(enriched);
+    onListsChange?.(enriched);
+    return enriched;
+
+    // setLists(transformed);
+    // onListsChange?.(transformed);
+    // return transformed;
   }
 
   useEffect(() => {
@@ -91,8 +153,11 @@ export default function ListSelector({ user, activeListId, onSelect, onListsChan
         <label className="text-sm font-medium">List:</label>
         <div className="flex items-center gap-2">
           <select
-            value={activeListId ?? ""} 
-            onChange={(e) => {const v = e.target.value; onSelect(v === "" ? null : String(v));}}
+            value={activeListId ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              onSelect(v === "" ? null : String(v));
+            }}
             className="border rounded px-2 py-1 min-w-[12rem]"
           >
             {lists.map((l) => (
@@ -155,6 +220,7 @@ export default function ListSelector({ user, activeListId, onSelect, onListsChan
         onClose={() => setManageOpen(false)}
         user={user}
         lists={lists}
+        setLists={setLists}
         triggerRef={manageBtnRef}
         onAfterCreate={async (created) => {
           const updated = await refreshLists(); //Select the new list

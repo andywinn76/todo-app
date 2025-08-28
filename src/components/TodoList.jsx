@@ -46,7 +46,15 @@ export default function TodoList({ user, todos, onRefresh }) {
     }
   }
 
-  if (!todos.length) return <p className="text-gray-500">No todos found.</p>;
+  if (!todos.length)
+    return (
+      <div className="text-center">
+        <p className="text-gray-700 text-2xl">No todos found.</p>
+        <p className="text-gray-500 text-xl mt-3">
+          Use the add button to add items to your list.
+        </p>
+      </div>
+    );
 
   return (
     <ul className="space-y-2">
