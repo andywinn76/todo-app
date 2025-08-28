@@ -12,7 +12,12 @@ import { supabase } from "@/lib/supabaseClient";
 
 function BellIcon({ className = "w-5 h-5" }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0a3 3 0 1 1-6 0m6 0H9"
         stroke="currentColor"
@@ -28,7 +33,7 @@ export default function InvitesBell({ userId }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
-  const rootRef = useRef(null); // wraps button(s) + popup
+  const rootRef = useRef(null); // wraps button(s) + popover
 
   async function refresh() {
     const listRes = await fetchPendingInvites(userId);
@@ -45,7 +50,7 @@ export default function InvitesBell({ userId }) {
     return unsubscribe;
   }, [userId]);
 
-  // Close on Escape or click outside
+  // Close on Escape or click outside (desktop) / tap backdrop (mobile)
   useEffect(() => {
     if (!open) return;
 
@@ -56,6 +61,7 @@ export default function InvitesBell({ userId }) {
       }
     };
     const onPointerDown = (e) => {
+      // On desktop we still want outside-click to close
       const root = rootRef.current;
       if (root && !root.contains(e.target)) setOpen(false);
     };
@@ -149,13 +155,29 @@ export default function InvitesBell({ userId }) {
         )}
       </button>
 
+      {/* MOBILE BACKDROP (shown only below sm) */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/20 sm:hidden"
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {open && (
         <div
           role="menu"
           aria-label="Invites"
-          className="absolute right-0 mt-2 w-72 rounded border bg-white shadow-lg z-50"
+          // Mobile: fixed top sheet; Desktop: anchored popover
+          className={[
+            "z-50 bg-white border shadow-lg",
+            // Mobile sheet at top
+            "fixed inset-x-3 top-20 rounded-2xl max-h-[75vh] overflow-hidden sm:inset-auto sm:top-auto sm:rounded",
+            // Desktop popover (anchor to bell)
+            "sm:absolute sm:right-0 sm:mt-2 sm:w-72",
+          ].join(" ")}
         >
-          <div className="px-3 py-2 border-b flex items-center justify-between">
+          <div className="px-3 py-2 border-b flex items-center justify-between sticky top-0 bg-white">
             <div className="font-medium text-sm">Invites</div>
             {count > 1 && (
               <button
@@ -163,11 +185,19 @@ export default function InvitesBell({ userId }) {
                   if (busy) return;
                   setBusy(true);
                   const ids = items.map((i) => i.id);
-                  const results = await Promise.allSettled(ids.map((id) => acceptInvite(id)));
+                  const results = await Promise.allSettled(
+                    ids.map((id) => acceptInvite(id))
+                  );
                   setBusy(false);
-                  const failed = results.filter((r) => r.status === "rejected" || r.value?.error);
-                  if (failed.length) toast.error(`Some invites failed (${failed.length}).`);
-                  else toast.success(`Joined ${ids.length} list${ids.length > 1 ? "s" : ""}`);
+                  const failed = results.filter(
+                    (r) => r.status === "rejected" || r.value?.error
+                  );
+                  if (failed.length)
+                    toast.error(`Some invites failed (${failed.length}).`);
+                  else
+                    toast.success(
+                      `Joined ${ids.length} list${ids.length > 1 ? "s" : ""}`
+                    );
                   refresh();
                   setOpen(false);
                 }}
@@ -181,14 +211,21 @@ export default function InvitesBell({ userId }) {
             )}
           </div>
 
-          <div className="max-h-72 overflow-auto">
+          <div className="max-h-[65vh] sm:max-h-72 overflow-auto">
             {count === 0 ? (
-              <div className="px-3 py-4 text-sm text-gray-500">No pending invites</div>
+              <div className="px-3 py-4 text-sm text-gray-500">
+                No pending invites
+              </div>
             ) : (
               items.map((inv) => (
-                <div key={inv.id} className="px-3 py-2 border-b last:border-b-0">
+                <div
+                  key={inv.id}
+                  className="px-3 py-2 border-b last:border-b-0"
+                >
                   <div className="text-sm font-medium">{inv.listName}</div>
-                  <div className="text-xs text-gray-500 mb-2">from {inv.inviterName}</div>
+                  <div className="text-xs text-gray-500 mb-2">
+                    from {inv.inviterName}
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => onAccept(inv.id)}
