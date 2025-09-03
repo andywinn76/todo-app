@@ -150,7 +150,7 @@ export default function ListSelector({
   return (
     <div className="mb-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <label className="text-sm font-medium">List:</label>
+        {/* <label className="text-sm font-medium">List:</label> */}
         <div className="flex items-center gap-2">
           <select
             value={activeListId ?? ""}

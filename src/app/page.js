@@ -9,7 +9,7 @@ import ShareListInline from "@/components/ShareListInline";
 
 export default function Home() {
   const [todos, setTodos] = useState([]);
-  const {user, userLoading } = useRequireAuth();
+  const { user, userLoading } = useRequireAuth();
   const [isActive, setIsActive] = useState(false);
   const [activeListId, setActiveListId] = useState(undefined);
   const [lists, setLists] = useState([]);
@@ -123,39 +123,55 @@ export default function Home() {
         onSelect={handleSelectList} /* ⬅ use the persistence-aware setter */
         onListsChange={setLists}
       />
-      <div className="flex items-center justify-between mb-6">
-        <div className="min-w-0">
-  <div className="flex items-center gap-2">
-    <h1 className="text-2xl font-bold truncate">{activeListName}</h1>
+      <div className="flex items-start justify-between gap-4 mb-6">
+  {/* LEFT */}
+  <div className="flex-1 min-w-0">
+    <div className="flex items-center gap-2">
+      <h1 className="text-2xl font-bold truncate">{activeListName}</h1>
 
+      {activeListId && (
+        <ShareListInline
+          listId={activeListId}
+          currentUserId={user.id}
+          isOpen={shareOpen}
+          onOpenChange={setShareOpen}
+          render="trigger" /* icon-only next to the title */
+        />
+      )}
+    </div>
+
+    {/* Inline form appears here when open, without wrecking the title spacing */}
     {activeListId && (
       <ShareListInline
         listId={activeListId}
         currentUserId={user.id}
         isOpen={shareOpen}
         onOpenChange={setShareOpen}
-        render="trigger"              // icon-only next to the title
+        onDone={() => setShareOpen(false)}
+        render="form-below" /* stacks under the title */
       />
+    )}
+
+    {lists.length > 0 && ownerLabel && (
+      <p className="text-sm text-gray-500 mt-1 truncate">{ownerLabel}</p>
     )}
   </div>
 
-  {/* Inline form appears here when open, without wrecking the title spacing */}
-  {activeListId && (
-    <ShareListInline
-      listId={activeListId}
-      currentUserId={user.id}
-      isOpen={shareOpen}
-      onOpenChange={setShareOpen}
-      onDone={() => setShareOpen(false)}
-      render="form-below"             // stacks under the title
-    />
+  {/* RIGHT */}
+  {hasValidActive && (
+    <div className="shrink-0">
+      <button
+        onClick={handleSetActive}
+        className={`px-4 py-2 rounded font-semibold border 
+          ${isActive ? "bg-gray-200 hover:bg-gray-300" : "bg-green-500 hover:bg-green-600 text-white"}`}
+        aria-expanded={isActive}
+      >
+        {isActive ? "Cancel" : "Add Todo"}
+      </button>
+    </div>
   )}
+</div>
 
-  {lists.length > 0 && ownerLabel && (
-    <p className="text-sm text-gray-500 mt-1 truncate">{ownerLabel}</p>
-  )}
-</div>
-</div>
 
       {isActive && activeListId && (
         <TodoForm
