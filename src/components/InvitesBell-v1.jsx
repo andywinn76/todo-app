@@ -9,10 +9,8 @@ import {
 } from "@/lib/invites";
 import { Check } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { useLists } from "@/components/ListsProvider";
 
 function BellIcon({ className = "w-5 h-5" }) {
-  
   return (
     <svg
       className={className}
@@ -32,28 +30,27 @@ function BellIcon({ className = "w-5 h-5" }) {
 }
 
 export default function InvitesBell({ userId }) {
-  const { refreshLists, setActiveListId } = useLists();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
-  const rootRef = useRef(null);
+  const rootRef = useRef(null); // wraps button(s) + popover
 
-  async function refreshInvites() {
+  async function refresh() {
     const listRes = await fetchPendingInvites(userId);
     if (!listRes.error) setItems(listRes.data || []);
   }
 
   useEffect(() => {
     if (!userId) return;
-    refreshInvites();
+    refresh();
     const unsubscribe = subscribeToInvites(userId, () => {
-      refreshInvites();
+      refresh();
       toast.info("You have a new list invite.");
     });
     return unsubscribe;
   }, [userId]);
 
-  // Close popover on Escape / outside click
+  // Close on Escape or click outside (desktop) / tap backdrop (mobile)
   useEffect(() => {
     if (!open) return;
 
@@ -64,6 +61,7 @@ export default function InvitesBell({ userId }) {
       }
     };
     const onPointerDown = (e) => {
+      // On desktop we still want outside-click to close
       const root = rootRef.current;
       if (root && !root.contains(e.target)) setOpen(false);
     };
@@ -76,105 +74,46 @@ export default function InvitesBell({ userId }) {
     };
   }, [open]);
 
-  
-  async function handlePostAccept(listId, listName) {
-  await refreshLists();
-  setActiveListId(listId);
-  toast.success(`Joined “${listName || "list"}”`);
-}
-
-
-  // Accept a SINGLE invite (expects the full invite object with listId/listName)
-  async function onAcceptInvite(inv) {
+  async function onAccept(id) {
     if (busy) return;
     setBusy(true);
-    const { error } = await acceptInvite(inv.id);
+    const { error } = await acceptInvite(id);
     setBusy(false);
-
-    if (error) {
-      return toast.error(error.message || "Could not accept invite");
-    }
-
-    // Remove it from the local list and close popover
-    setItems((prev) => prev.filter((i) => i.id !== inv.id));
+    if (error) return toast.error(error.message || "Could not accept invite");
+    toast.success("Joined list");
+    await refresh();
     setOpen(false);
-
-    // Now run the post-accept cascade
-    await handlePostAccept(inv.listId, inv.listName);
   }
 
-  // Decline a SINGLE invite
-  async function onDeclineInvite(invId) {
+  async function onDecline(id) {
     if (busy) return;
     setBusy(true);
-    const { error } = await declineInvite(invId);
+    const { error } = await declineInvite(id);
     setBusy(false);
     if (error) return toast.error(error.message || "Could not decline invite");
     toast.success("Invite declined");
-    refreshInvites();
-    setOpen(false)
+    refresh();
   }
 
-  // One-click: accept newest invite (uses the first item from state)
+  // One-click: accept newest invite (fallback fetch if items empty)
   async function onQuickAccept() {
     if (busy) return;
 
     if (items.length) {
-      await onAcceptInvite(items[0]);
+      await onAccept(items[0].id);
       return;
     }
 
-    // Fallback fetch
     const { data, error } = await supabase
       .from("invites")
-      .select("id, list_id")
+      .select("id")
       .eq("invitee", userId)
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(1);
 
     if (!error && data?.length) {
-      // We only have list_id here, not name — that’s okay
-      setBusy(true);
-      const { error: err2 } = await acceptInvite(data[0].id);
-      setBusy(false);
-      if (err2) return toast.error(err2.message || "Could not accept invite");
-      setOpen(false);
-      await handlePostAccept(data[0].list_id, undefined);
-    }
-  }
-
-  // Accept ALL pending invites (activate the newest one by default)
-  async function onAcceptAll() {
-    if (busy || items.length === 0) return;
-
-    setBusy(true);
-    const results = await Promise.allSettled(
-      items.map((i) => acceptInvite(i.id))
-    );
-    setBusy(false);
-
-    const failed = results.filter(
-      (r) => r.status === "rejected" || r.value?.error
-    );
-    if (failed.length) {
-      toast.error(`Some invites failed (${failed.length}).`);
-    } else {
-      toast.success(
-        `Joined ${items.length} list${items.length > 1 ? "s" : ""}`
-      );
-    }
-
-    // Choose which list to activate: the newest one (first item, since you order desc)
-    const newest = items[0];
-    setItems([]);
-    setOpen(false);
-
-    if (newest) {
-      await handlePostAccept(newest.listId, newest.listName);
-    } else {
-      // If for some reason we don't have it, just soft-reload
-      setTimeout(() => window.location.reload(), 150);
+      await onAccept(data[0].id);
     }
   }
 
@@ -216,7 +155,7 @@ export default function InvitesBell({ userId }) {
         )}
       </button>
 
-      {/* MOBILE BACKDROP */}
+      {/* MOBILE BACKDROP (shown only below sm) */}
       {open && (
         <div
           className="fixed inset-0 z-40 bg-black/20 sm:hidden"
@@ -229,9 +168,12 @@ export default function InvitesBell({ userId }) {
         <div
           role="menu"
           aria-label="Invites"
+          // Mobile: fixed top sheet; Desktop: anchored popover
           className={[
             "z-50 bg-white border shadow-lg",
+            // Mobile sheet at top
             "fixed inset-x-3 top-20 rounded-2xl max-h-[75vh] overflow-hidden sm:inset-auto sm:top-auto sm:rounded",
+            // Desktop popover (anchor to bell)
             "sm:absolute sm:right-0 sm:mt-2 sm:w-72",
           ].join(" ")}
         >
@@ -239,7 +181,26 @@ export default function InvitesBell({ userId }) {
             <div className="font-medium text-sm">Invites</div>
             {count > 1 && (
               <button
-                onClick={onAcceptAll}
+                onClick={async () => {
+                  if (busy) return;
+                  setBusy(true);
+                  const ids = items.map((i) => i.id);
+                  const results = await Promise.allSettled(
+                    ids.map((id) => acceptInvite(id))
+                  );
+                  setBusy(false);
+                  const failed = results.filter(
+                    (r) => r.status === "rejected" || r.value?.error
+                  );
+                  if (failed.length)
+                    toast.error(`Some invites failed (${failed.length}).`);
+                  else
+                    toast.success(
+                      `Joined ${ids.length} list${ids.length > 1 ? "s" : ""}`
+                    );
+                  refresh();
+                  setOpen(false);
+                }}
                 disabled={busy}
                 className="text-xs rounded border px-2 py-1 hover:bg-gray-50 disabled:opacity-50"
                 title="Accept all invites"
@@ -267,7 +228,7 @@ export default function InvitesBell({ userId }) {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => onAcceptInvite(inv)}
+                      onClick={() => onAccept(inv.id)}
                       disabled={busy}
                       className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
                       type="button"
@@ -275,7 +236,7 @@ export default function InvitesBell({ userId }) {
                       Accept
                     </button>
                     <button
-                      onClick={() => onDeclineInvite(inv.id)}
+                      onClick={() => onDecline(inv.id)}
                       disabled={busy}
                       className="rounded border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
                       type="button"

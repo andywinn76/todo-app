@@ -1,29 +1,18 @@
 "use client";
-import { useEffect, useState } from "react";
-import { fetchTodos, toggleTodo, updateTodo, deleteTodo } from "@/lib/todos";
+import { useState } from "react";
+import { toggleTodo, updateTodo, deleteTodo } from "@/lib/todos";
 import { toast } from "sonner";
 import { FaTrashAlt, FaPencilAlt, FaCheck, FaTimes } from "react-icons/fa";
 
 export default function TodoList({ user, todos, onRefresh }) {
-  const userId = user?.id;
   const [editingId, setEditingId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const [editPriority, setEditPriority] = useState("medium");
 
-  async function loadTodos() {
-    const { data, error } = await fetchTodos(userId);
-    if (error) return toast.error("Failed to load todos");
-    onRefresh();
-  }
-
-  useEffect(() => {
-    if (userId) loadTodos();
-  }, [userId]);
-
   async function handleToggle(id, completed) {
     const { error } = await toggleTodo(id, !completed);
     if (error) return toast.error("Could not update todo");
-    loadTodos();
+    onRefresh?.();
   }
 
   async function handleSave(id) {
@@ -34,7 +23,7 @@ export default function TodoList({ user, todos, onRefresh }) {
     if (error) return toast.error("Error saving changes");
     toast.success("Todo updated!");
     setEditingId(null);
-    onRefresh();
+    onRefresh?.();
   }
 
   async function handleDelete(id) {
@@ -42,11 +31,11 @@ export default function TodoList({ user, todos, onRefresh }) {
       const { error } = await deleteTodo(id);
       if (error) return toast.error("Error deleting todo");
       toast.success("Todo deleted");
-      onRefresh();
+      onRefresh?.();
     }
   }
 
-  if (!todos.length)
+  if (!todos || todos.length === 0) {
     return (
       <div className="text-center">
         <p className="text-gray-700 text-2xl">No todos found.</p>
@@ -55,6 +44,7 @@ export default function TodoList({ user, todos, onRefresh }) {
         </p>
       </div>
     );
+  }
 
   return (
     <ul className="space-y-2">
@@ -72,14 +62,11 @@ export default function TodoList({ user, todos, onRefresh }) {
               checked={todo.completed}
               onChange={() => handleToggle(todo.id, todo.completed)}
               className="flex-none disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label={
-                todo.completed ? "Mark as not completed" : "Mark as completed"
-              }
-              disabled={editingId === todo.id}
+              aria-label={todo.completed ? "Mark as not completed" : "Mark as completed"}
+              disabled={isEditing}
             />
 
-            {editingId === todo.id ? (
-              // EDITING LAYOUT
+            {isEditing ? (
               <div className="w-full md:w-auto flex-1 min-w-0 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                 <input
                   className="min-w-0 flex-1 w-full border p-2 rounded"
@@ -118,13 +105,8 @@ export default function TodoList({ user, todos, onRefresh }) {
                 </div>
               </div>
             ) : (
-              // READ-ONLY LAYOUT
               <div className="w-full md:w-auto flex-1 min-w-0 flex flex-wrap items-center gap-2">
-                <span
-                  className={`min-w-0 flex-1 ${
-                    todo.completed ? "line-through" : ""
-                  }`}
-                >
+                <span className={`min-w-0 flex-1 ${todo.completed ? "line-through" : ""}`}>
                   {todo.title}
                 </span>
 

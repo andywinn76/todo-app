@@ -8,12 +8,17 @@ import Logo from "@/components/Logo";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
 
+// Simple detector: treat input as email if it includes "@"
+function looksLikeEmail(v) {
+  return /\S+@\S+\.\S+/.test(v);
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName]   = useState("");
   const [username, setUsername]   = useState("");
-  const [email, setEmail]         = useState("");
+  const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword]   = useState("");
   const [isSignUp, setIsSignUp]   = useState(false);
   const [error, setError]         = useState("");
@@ -25,8 +30,7 @@ export default function LoginPage() {
     const { count, error: err } = await supabase
       .from("profiles")
       .select("id", { count: "exact", head: true })
-      .eq("username", clean);
-
+      .ilike("username", clean);
     if (err) {
       toast.error("Could not check username. Try again.");
       return false;
@@ -39,10 +43,9 @@ export default function LoginPage() {
     setError("");
     setBusy(true);
 
-    const emailTrim = email.trim();
     const passTrim = password;
     const first = firstName.trim();
-    const last  = lastName.trim();
+    const last = lastName.trim();
     const uname = username.trim().toLowerCase();
 
     try {
@@ -54,7 +57,7 @@ export default function LoginPage() {
           return;
         }
 
-        // Pre-check availability to show a friendly error
+        // Pre-check availability
         const ok = await usernameAvailable(uname);
         if (!ok) {
           setError("That username is already taken. Try another.");
@@ -62,17 +65,24 @@ export default function LoginPage() {
           return;
         }
 
-        // Create auth user and stash names in user_metadata
+        // For sign-up, we still collect email in the same box
+        const emailTrim = emailOrUsername.trim().toLowerCase();
+        if (!looksLikeEmail(emailTrim)) {
+          setError("Please enter a valid email address.");
+          setBusy(false);
+          return;
+        }
+
+        // Create auth user and stash names + username in user_metadata
         const { data: sign, error: signErr } = await supabase.auth.signUp({
           email: emailTrim,
           password: passTrim,
           options: {
             data: {
               first_name: first,
-              last_name:  last,
-              full_name:  `${first} ${last}`.trim(),
-              // (optional) also stash username in metadata for reference
-              username:   uname,
+              last_name: last,
+              full_name: `${first} ${last}`.trim(),
+              username: uname,
             },
           },
         });
@@ -83,26 +93,23 @@ export default function LoginPage() {
           return;
         }
 
-        // If email confirmations are OFF, we’ll have a session now and can write profiles.
-        // If confirmations are ON, there may be no session yet; the Account page will upsert later.
+        // If email confirmations are OFF, we have a session and can upsert profile
         const hasSession = !!sign.session;
         if (hasSession && sign.user) {
-          const { error: upErr } = await supabase
-            .from("profiles")
-            .upsert(
-              {
-                id: sign.user.id,
-                first_name: first || null,
-                last_name:  last || null,
-                username:   uname, // unique enforced in DB
-                avatar_url: null,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: "id" }
-            );
+          const { error: upErr } = await supabase.from("profiles").upsert(
+            {
+              id: sign.user.id,
+              first_name: first || null,
+              last_name: last || null,
+              username: uname, // unique in DB
+              email: emailTrim, // store email for username login lookup
+              avatar_url: null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "id" }
+          );
 
           if (upErr) {
-            // 23505 = unique violation (race condition edge case)
             if (upErr.code === "23505") {
               setError("That username was just taken. Please choose another.");
               setBusy(false);
@@ -115,18 +122,42 @@ export default function LoginPage() {
         }
 
         toast.success("Account created! Check your email to verify (if required).");
-        router.push("/"); // Your app guards root; will redirect if not verified/signed in
+        router.push("/");
       } else {
-        // Login
+        // LOGIN: allow email OR username
+        const raw = emailOrUsername.trim();
+
+        let emailToUse = raw;
+        if (!looksLikeEmail(raw)) {
+          // treat as username: resolve to email via RPC
+          const { data: resolved, error: rpcErr } = await supabase.rpc(
+            "lookup_email_for_username",
+            { uname: raw.toLowerCase() }
+          );
+          if (rpcErr) {
+            setError("Could not look up that username. Try again.");
+            setBusy(false);
+            return;
+          }
+          if (!resolved) {
+            setError("No account found with that username.");
+            setBusy(false);
+            return;
+          }
+          emailToUse = resolved;
+        }
+
         const { error: signInErr } = await supabase.auth.signInWithPassword({
-          email: emailTrim,
+          email: emailToUse,
           password: passTrim,
         });
+
         if (signInErr) {
           setError(signInErr.message);
           setBusy(false);
           return;
         }
+
         toast.success("Logged in!");
         router.push("/");
       }
@@ -137,7 +168,12 @@ export default function LoginPage() {
 
   return (
     <main className="max-w-md mx-auto mt-20 p-6 border rounded-xl shadow">
-      <Logo type="static" size={200} className="mx-auto mb-6 rounded-2xl" priority />
+      <Logo
+        type="static"
+        size={200}
+        className="mx-auto mb-6 rounded-2xl"
+        priority
+      />
       <h1 className="text-3xl font-bold mb-4">Welcome to Let's Doooo It!</h1>
       <p className="mx-14 text-blue-600 text-center mb-6">
         To get started, either login or sign-up using the form below.
@@ -173,6 +209,10 @@ export default function LoginPage() {
                 className="w-full border px-3 py-2 rounded"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                pattern="^[A-Za-z0-9_]{3,20}$"
+                minLength={3}
+                maxLength={20}
+                autoComplete="username"
                 required
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -183,19 +223,22 @@ export default function LoginPage() {
         )}
 
         <input
-          type="email"
-          placeholder="Email"
+          type="text"
+          placeholder={isSignUp ? "Email" : "Email or Username"}
           className="w-full border px-3 py-2 rounded"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={emailOrUsername}
+          onChange={(e) => setEmailOrUsername(e.target.value)}
+          autoComplete={isSignUp ? "email" : "username"}
           required
         />
+
         <input
           type="password"
           placeholder="Password"
           className="w-full border px-3 py-2 rounded"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete={isSignUp ? "new-password" : "current-password"}
           required
         />
 
@@ -205,14 +248,23 @@ export default function LoginPage() {
           disabled={busy}
           className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         >
-          {busy ? (isSignUp ? "Creating…" : "Logging in…") : (isSignUp ? "Sign Up" : "Log In")}
+          {busy
+            ? isSignUp
+              ? "Creating…"
+              : "Logging in…"
+            : isSignUp
+            ? "Sign Up"
+            : "Log In"}
         </button>
       </form>
 
       <p className="mt-4 text-sm">
         {isSignUp ? "Already have an account?" : "Need an account?"}{" "}
         <button
-          onClick={() => setIsSignUp(!isSignUp)}
+          onClick={() => {
+            setIsSignUp(!isSignUp);
+            setError("");
+          }}
           className="underline text-blue-600"
         >
           {isSignUp ? "Log in" : "Sign up"}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { upsertProfileFromAuthUser } from "@/utils/profileSync";
 import { toast } from "sonner";
 
 export default function AccountPage() {
@@ -13,6 +14,14 @@ export default function AccountPage() {
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const { error } = await upsertProfileFromAuthUser();
+      if (error) console.warn("Profile sync failed:", error);
+      setLoading(false);
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -35,7 +44,7 @@ export default function AccountPage() {
 
       setEmail(user.email ?? "");
 
-      // Try to fetch profile row
+      // Fetch profile row (upsertProfileFromAuthUser should have created it)
       const { data: profile, error: profErr } = await supabase
         .from("profiles")
         .select("*")
@@ -48,26 +57,24 @@ export default function AccountPage() {
         return;
       }
 
-      if (!profile) {
-        // Create a default profile row if missing (RLS allows insert for self)
-        const { error: insertErr } = await supabase.from("profiles").insert({
-          id: user.id,
-          first_name: user.user_metadata?.first_name ?? "",
-          last_name: user.user_metadata?.last_name ?? "",
-          username: null,
-          avatar_url: null,
-        });
-        if (insertErr) {
-          toast.error("Could not create profile row");
-        } else {
-          setFirstName(user.user_metadata?.first_name ?? "");
-          setLastName(user.user_metadata?.last_name ?? "");
-        }
-      } else {
+      if (profile) {
         setFirstName(profile.first_name ?? "");
         setLastName(profile.last_name ?? "");
         setUsername(profile.username ?? "");
         setAvatarUrl(profile.avatar_url ?? "");
+      } else {// As a fallback only (shouldn’t happen after upsertProfileFromAuthUser)
+        const { error: insertErr } = await supabase.from("profiles").insert({
+          id: user.id,
+          first_name: user.user_metadata?.first_name ?? "",
+          last_name:  user.user_metadata?.last_name  ?? "",
+          username:   null,
+          avatar_url: null,
+          email:      user.email ?? null,
+          updated_at: new Date().toISOString(),
+        });
+        if (insertErr) toast.error("Could not create profile row");
+        setFirstName(user.user_metadata?.first_name ?? "");
+        setLastName(user.user_metadata?.last_name ?? "");
       }
 
       setLoading(false);
@@ -89,19 +96,19 @@ export default function AccountPage() {
     }
 
     // 1) Update profiles
-    const { error: upErr } = await supabase
-      .from("profiles")
-      .upsert(
-        {
-          id: user.id,
-          first_name: firstName?.trim() || null,
-          last_name: lastName?.trim() || null,
-          username: username?.trim() || null,
-          avatar_url: avatarUrl || null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id" }
-      );
+    const email = user.email || null;
+    const { error: upErr } = await supabase.from("profiles").upsert(
+      {
+        id: user.id,
+        first_name: firstName?.trim() || null,
+        last_name: lastName?.trim() || null,
+        username: username?.trim()?.toLowerCase() || null,
+        avatar_url: avatarUrl || null,
+        email,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
 
     if (upErr) {
       // Unique violation code from Postgres is 23505 (surfaced by Supabase)
@@ -119,8 +126,7 @@ export default function AccountPage() {
       data: {
         first_name: firstName?.trim() || null,
         last_name: lastName?.trim() || null,
-        full_name:
-          `${firstName ?? ""} ${lastName ?? ""}`.trim() || null,
+        full_name: `${firstName ?? ""} ${lastName ?? ""}`.trim() || null,
       },
     });
     if (metaErr) {
@@ -179,9 +185,7 @@ export default function AccountPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">
-              First name
-            </label>
+            <label className="block text-sm font-medium mb-1">First name</label>
             <input
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
@@ -190,9 +194,7 @@ export default function AccountPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Last name
-            </label>
+            <label className="block text-sm font-medium mb-1">Last name</label>
             <input
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
@@ -208,10 +210,13 @@ export default function AccountPage() {
             value={username ?? ""}
             onChange={(e) => setUsername(e.target.value)}
             className="w-full rounded border px-3 py-2"
-            placeholder="andywinn"
+            placeholder="username"
+            pattern="^[A-Za-z0-9_]{3,20}$"
+            minLength={3}
+            maxLength={20}
           />
           <p className="text-xs text-gray-500 mt-1">
-            Must be unique. Letters, numbers, and underscores are safest.
+            Unique username, 3 to 30 characters: letters, numbers, and underscores are allowed.
           </p>
         </div>
 

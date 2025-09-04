@@ -26,7 +26,8 @@ export default function ShareListInline({
   onDone,
   render = "combined",
 }) {
-  const isControlled = typeof isOpen === "boolean" && typeof onOpenChange === "function";
+  const isControlled =
+    typeof isOpen === "boolean" && typeof onOpenChange === "function";
   const [internalOpen, setInternalOpen] = useState(false);
   const open = isControlled ? isOpen : internalOpen;
   const setOpen = isControlled ? onOpenChange : setInternalOpen;
@@ -85,7 +86,7 @@ export default function ShareListInline({
     >
       <div className="flex items-start gap-2">
         <div className="flex-1">
-          <label className="block text-xs text-gray-600 mb-1">
+          <label className="block text-sm font-bold text-gray-800 mb-1">
             Invite by username or email
           </label>
           <input
@@ -98,7 +99,10 @@ export default function ShareListInline({
             autoFocus
           />
         </div>
-        <div className="flex flex-col gap-2">
+      </div>
+      <div className="flex items-center justify-between mt-2 text-[11px] text-gray-500">
+        <span>Only list owners can send invites.</span>
+        <div className="flex gap-2">
           <button
             type="submit"
             className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
@@ -116,9 +120,6 @@ export default function ShareListInline({
             <FaXmark />
           </button>
         </div>
-      </div>
-      <div className="mt-2 text-[11px] text-gray-500">
-        Only list owners can send invites.
       </div>
     </form>
   );

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { LogOut } from "lucide-react";
 import Logo from "./Logo";
 import InvitesBell from "@/components/InvitesBell";
+import Link from "next/link";
 
 export default function Header({ children }) {
   const router = useRouter();
@@ -40,16 +41,37 @@ export default function Header({ children }) {
       <Logo type="responsive" size="header" className="ml-2 sm:ml-4" priority />
 
       <div className="flex items-center gap-2 sm:gap-4">
-        <InvitesBell userId={user.id} />
+        {/* Bell notification for invites */}
+        <InvitesBell
+          userId={user?.id}
+          onAfterAccept={async (listId, listName) => {
+            // 1) Re-fetch lists/memberships
+            await refreshLists?.();
 
-        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg">
-          {initials}
-        </div>
+            // 2) Set the newly joined list active
+            setActiveListId(listId); 
 
+            // 3) (Optional) If your todos don’t auto-fetch on activeList change:
+            // await fetchTodosForList(listId);
+
+            toast.success(`Joined “${listName || "list"}”`);
+          }}
+        />
+        {/* Welcome message and user initials */}
         <h1 className="text-base md:text-lg lg:text-xl font-semibold mr-2 md:mr-5">
-          Welcome, {firstName || "Friend"}!
+          Welcome, {firstName || "User"}!
         </h1>
-
+        {/* Avatar with user initials */}
+        <Link
+          href="/account"
+          aria-label="Open account page"
+          title="Open account page"
+          className="group rounded-full outline-none"
+        >
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg ring-0 group-focus-visible:ring-2 group-focus-visible:ring-blue-600 cursor-pointer">
+            {initials}
+          </div>
+        </Link>
         <button
           onClick={handleLogout}
           aria-label="Log out"

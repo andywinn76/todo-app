@@ -1,11 +1,11 @@
 "use client";
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { createTodo } from "@/lib/todos";
+import { useLists } from "@/components/ListsProvider";
 
-export default function TodoForm({ user, listId, onTodoAdded, isActive, setIsActive }) {
-  const userId = user?.id;
+export default function TodoForm({ user, onTodoAdded, isActive, setIsActive }) {
+  const { activeListId } = useLists(); 
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState("");
@@ -14,45 +14,37 @@ export default function TodoForm({ user, listId, onTodoAdded, isActive, setIsAct
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (saving) return;
 
-    if (!listId) {
-      toast.error("Select or create a list first");
-      return;
-    }
-    if (!title.trim()) {
-      toast.error("Title is required");
-      return;
-    }
-    if (!priority) {
-      toast.error("Priority must be selected");
-      return;
-    }
-    if (!dueDate) {
-      toast.error("Due date is required");
-      return;
-    }
+    if (!activeListId) return toast.error("Select or create a list first");
+    if (!title.trim()) return toast.error("Title is required");
+    if (!priority) return toast.error("Priority must be selected");
+    if (!dueDate) return toast.error("Due date is required");
 
     setSaving(true);
-    const { error } = await createTodo({
-      title,
-      description,
-      due_date: dueDate,
-      priority,
-      userId,
-      listId,              // ← add this
-    });
-    setSaving(false);
+    try {
+      const { error } = await createTodo({
+        title: title.trim(),
+        description,
+        due_date: dueDate,
+        priority,
+        listId: activeListId, // ← guaranteed from provider
+      });
+      if (error) {
+        console.error("createTodo error", error);
+        toast.error("Failed to add todo");
+        return;
+      }
 
-    if (error) {
-      toast.error("Failed to add todo");
-    } else {
       toast.success("Todo added!");
       setTitle("");
       setPriority("medium");
       setDueDate("");
       setDescription("");
-      setIsActive(false);      // close the form after adding
-      onTodoAdded?.();         // refresh list
+      setIsActive(false);
+      onTodoAdded?.();
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -105,11 +97,9 @@ export default function TodoForm({ user, listId, onTodoAdded, isActive, setIsAct
 
       <button
         type="submit"
-        disabled={saving || !listId}
-        title={!listId ? "Select or create a list first" : ""}
-        className={`${
-          saving ? "opacity-75 cursor-not-allowed" : ""
-        } bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700`}
+        disabled={saving || !activeListId}
+        title={!activeListId ? "Select or create a list first" : ""}
+        className={`${saving ? "opacity-75 cursor-not-allowed" : ""} bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700`}
       >
         {saving ? "Adding..." : "Add Todo"}
       </button>
