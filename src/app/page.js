@@ -74,7 +74,7 @@ export default function Home() {
       return;
     }
     fetchTodos();
-  }, [user, activeListId, lists]); // re-run when selection or list set changes
+  }, [user, activeListId, lists, hasValidActive]); // re-run when selection or list set changes
 
   if (!user || userLoading) return <p className="p-6">Loading...</p>;
 
