@@ -1,3 +1,511 @@
+// "use client";
+// import { useEffect, useRef, useState } from "react";
+// import { supabase } from "@/lib/supabaseClient";
+// import { toast } from "sonner";
+// import ShareListInline from "@/components/ShareListInline";
+// import { FaTrashAlt, FaPencilAlt } from "react-icons/fa";
+// import { FaXmark } from "react-icons/fa6";
+
+// export default function ManageListsDrawer({
+//   open,
+//   onClose,
+//   user,
+//   lists,
+//   setLists,
+//   onAfterDelete, // async (deletedListId) => void
+//   onAfterCreate, // async (createdList) => void
+//   triggerRef, // ref to the "Manage" button (for focus return)
+// }) {
+//   const [deletingId, setDeletingId] = useState(null);
+//   const [confirmId, setConfirmId] = useState(null);
+//   const [busy, setBusy] = useState(false);
+
+//   // Create form state
+//   const [showCreateForm, setShowCreateForm] = useState(false);
+//   const [createdThisSession, setCreatedThisSession] = useState(false);
+//   const [newName, setNewName] = useState("");
+//   const [creating, setCreating] = useState(false);
+
+//   const panelRef = useRef(null);
+//   const focusStartRef = useRef(null);
+//   const createInputRef = useRef(null);
+
+//   // Sharing state (which list id is currently inviting)
+//   const [shareOpenId, setShareOpenId] = useState(null);
+
+//   // Unsubscribe state (which list id is currently unsubscribing)
+//   const [unsubscribingId, setUnsubscribingId] = useState(null);
+//   const [confirmUnsubId, setConfirmUnsubId] = useState(null);
+
+//   // Helper: is the current user the owner of this list?
+//   function isOwner(list) {
+//     // Your rows already include created_by; prefer that.
+//     if (list?.created_by) return list.created_by === user.id;
+//     // Fallback if your query hydrates role:
+//     if (list?._role) return list._role === "owner";
+//     return false;
+//   }
+
+//   // Helper: can the current user unsubscribe from this list?
+//   function canUnsubscribe(list) {
+//     return !isOwner(list);
+//   }
+
+//   // Focus trap + esc + body scroll lock
+//   useEffect(() => {
+//     if (!open) return;
+
+//     const prevOverflow = document.body.style.overflow;
+//     document.body.style.overflow = "hidden";
+//     setTimeout(() => (focusStartRef.current || panelRef.current)?.focus(), 0);
+
+//     function onKeyDown(e) {
+//       if (e.key === "Escape") {
+//         e.preventDefault();
+//         if (!busy && !creating) handleClose();
+//       }
+//       if (e.key === "Tab") {
+//         const root = panelRef.current;
+//         if (!root) return;
+//         const selectors =
+//           'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+//         const focusables = Array.from(root.querySelectorAll(selectors)).filter(
+//           (el) => !el.hasAttribute("disabled") && el.tabIndex !== -1
+//         );
+//         if (!focusables.length) return;
+//         const first = focusables[0];
+//         const last = focusables[focusables.length - 1];
+//         const current = document.activeElement;
+//         if (!e.shiftKey && current === last) {
+//           e.preventDefault();
+//           first.focus();
+//         }
+//         if (e.shiftKey && current === first) {
+//           e.preventDefault();
+//           last.focus();
+//         }
+//       }
+//     }
+
+//     document.addEventListener("keydown", onKeyDown);
+//     return () => {
+//       document.body.style.overflow = prevOverflow;
+//       document.removeEventListener("keydown", onKeyDown);
+//     };
+//   }, [open, busy, creating]);
+
+//   // Autofocus when the create form is revealed
+//   useEffect(() => {
+//     if (showCreateForm) setTimeout(() => createInputRef.current?.focus(), 0);
+//   }, [showCreateForm]);
+
+//   // Session reset when drawer opens
+//   useEffect(() => {
+//     if (!open) return;
+//     setShowCreateForm(false);
+//     setCreatedThisSession(false);
+//     setNewName("");
+//     setShareOpenId(null);
+//     setDeletingId(null);
+//     setConfirmId(null);
+//     setConfirmUnsubId(null);
+//     setUnsubscribingId(null);
+//   }, [open]);
+
+//   function handleClose() {
+//     onClose?.();
+//     setTimeout(() => triggerRef?.current?.focus?.(), 0);
+//   }
+
+//   async function handleCreate(e) {
+//     e.preventDefault();
+//     if (!user) return;
+//     const name = newName.trim();
+//     if (!name) {
+//       toast.error("Please enter a list name");
+//       return;
+//     }
+//     setCreating(true);
+//     const { data: list, error } = await supabase
+//       .from("lists")
+//       .insert([{ name, created_by: user.id }]) // trigger will add owner membership
+//       .select()
+//       .single();
+//     setCreating(false);
+
+//     if (error) {
+//       console.error("create list error:", error);
+//       toast.error("Could not create list");
+//       return;
+//     }
+
+//     toast.success("List created");
+//     setNewName("");
+//     setShowCreateForm(false);
+//     setCreatedThisSession(true);
+//     await onAfterCreate?.(list); // parent will refresh + select
+//     handleClose();
+//   }
+
+//   async function handleDelete(list) {
+//     if (!user) return;
+//     setBusy(true);
+
+//     // delete todos first (safer if FK isn't cascade)
+//     const { error: tdErr } = await supabase
+//       .from("todos")
+//       .delete()
+//       .eq("list_id", list.id);
+//     if (tdErr) {
+//       console.error("delete todos error:", tdErr);
+//       toast.error("Could not delete todos for this list");
+//       setBusy(false);
+//       return;
+//     }
+
+//     const { error: lsErr } = await supabase
+//       .from("lists")
+//       .delete()
+//       .eq("id", list.id)
+//       .eq("created_by", user.id); // creator-only
+//     setBusy(false);
+
+//     if (lsErr) {
+//       console.error("delete list error:", lsErr);
+//       toast.error("Could not delete list");
+//       return;
+//     }
+
+//     toast.success(`Deleted “${list.name || "Untitled"}”`);
+//     setConfirmId(null);
+//     setDeletingId(null);
+//     await onAfterDelete?.(list.id);
+//   }
+
+//   // Owner display helper
+//   function ownerLabelFor(list, user) {
+//     if (!list) return "—";
+//     if (list.created_by === user.id) return "Me";
+
+//     const f =
+//       (list.owner_first_name ?? list.owner?.first_name ?? "").trim?.() || "";
+//     const l =
+//       (list.owner_last_name ?? list.owner?.last_name ?? "").trim?.() || "";
+//     const u =
+//       (list.owner_username ?? list.owner?.username ?? "").trim?.() || "";
+
+//     if (f) {
+//       const initial = l ? `${l[0].toUpperCase()}.` : "";
+//       return `${f} ${initial}`.trim();
+//     }
+//     if (u) return u; // fallback to username if no names
+//     return "—";
+//   }
+
+//   // Unsubscribe handler
+//   async function handleUnsubscribe(listId, userId) {
+//     try {
+//       setBusy(true);
+//       setUnsubscribingId(listId);
+
+//       const { error } = await supabase
+//         .from("list_members")
+//         .delete()
+//         .eq("list_id", listId)
+//         .eq("user_id", userId);
+
+//       if (error) {
+//         console.error(error);
+//         toast.error("Could not unsubscribe. Please try again.");
+//         return;
+//       }
+
+//       toast.success("You left the list.");
+//       setConfirmUnsubId(null);
+//       setUnsubscribingId(null);
+
+//       // Update parent (remove from local lists, maybe reset active)
+//       await onAfterDelete?.(listId);
+
+//       // Optional: close the drawer after success
+//       handleClose();
+//     } finally {
+//       setBusy(false);
+//       setUnsubscribingId(null);
+//     }
+//   }
+
+//   if (!open) return null;
+
+//   return (
+//     <>
+//       <div
+//         className="fixed inset-0 bg-black/40 z-40"
+//         onClick={() => !busy && !creating && handleClose()}
+//         aria-hidden="true"
+//       />
+//       <aside
+//         id="manage-lists-drawer"
+//         ref={panelRef}
+//         role="dialog"
+//         aria-modal="true"
+//         aria-labelledby="manage-lists-title"
+//         className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-white shadow-2xl p-4 outline-none
+//                    sm:left-auto sm:top-0 sm:bottom-0 sm:w-[380px] sm:rounded-none sm:right-0"
+//         tabIndex={-1}
+//       >
+//         <div className="flex items-center justify-between mb-3">
+//           <h2
+//             id="manage-lists-title"
+//             className="text-lg font-semibold"
+//             ref={focusStartRef}
+//             tabIndex={-1}
+//           >
+//             Manage Lists
+//           </h2>
+//           {!createdThisSession && !showCreateForm && (
+//             <button
+//               type="button"
+//               onClick={() => setShowCreateForm(true)}
+//               disabled={busy || creating}
+//               className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+//               aria-controls="create-list-form"
+//             >
+//               Add New
+//             </button>
+//           )}
+//           <button
+//             onClick={handleClose}
+//             disabled={busy || creating}
+//             className="text-sm px-3 py-1 rounded border hover:bg-gray-50"
+//             aria-label="Close manage lists"
+//           >
+//             Close
+//           </button>
+//         </div>
+
+//         {showCreateForm && (
+//           <form
+//             id="create-list-form"
+//             onSubmit={handleCreate}
+//             className="rounded border bg-white p-3 shadow-sm mb-3"
+//           >
+//             <label className="block text-sm font-semibold mb-1">
+//               New list name
+//             </label>
+//             <input
+//               ref={createInputRef}
+//               type="text"
+//               value={newName}
+//               onChange={(e) => setNewName(e.target.value)}
+//               className="w-full border rounded px-3 py-2 mb-3"
+//               placeholder="e.g., Groceries, Trip Planning"
+//               disabled={creating}
+//             />
+//             <div className="flex gap-2">
+//               <button
+//                 type="submit"
+//                 disabled={creating || !newName.trim()}
+//                 className={`${
+//                   creating ? "opacity-75 cursor-not-allowed" : ""
+//                 } bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded`}
+//               >
+//                 {creating ? "Creating…" : "Create List"}
+//               </button>
+//               <button
+//                 type="button"
+//                 onClick={() => {
+//                   setNewName("");
+//                   setShowCreateForm(false);
+//                 }}
+//                 disabled={creating}
+//                 className="border px-3 py-2 rounded hover:bg-gray-50"
+//               >
+//                 Cancel
+//               </button>
+//             </div>
+//           </form>
+//         )}
+
+//         {/* Existing lists */}
+//         <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
+//           {lists.length === 0 && (
+//             <p className="text-sm text-gray-600">No lists yet.</p>
+//           )}
+
+//           {lists.map((list) => {
+//             const isConfirmingDelete = confirmId === list.id;
+//             const isDeleting = deletingId === list.id && busy;
+//             const inviting = shareOpenId === list.id;
+//             const canInvite =
+//               list?.created_by === user.id || list?._role === "owner";
+
+//             return (
+//               <div key={list.id} className="rounded border p-3">
+//                 {/* Row header */}
+//                 <div className="flex items-center justify-between gap-2">
+//                   <div className="min-w-0 flex-1">
+//                     <div className={`font-medium ${inviting ? "" : "truncate"}`}>
+//                       {list.name || "Untitled"}
+//                     </div>
+//                     <div className="text-xs text-gray-500">
+//                       Owner: {ownerLabelFor(list, user)}
+//                     </div>
+//                   </div>
+
+//                   {/* Actions */}
+//                   {!isConfirmingDelete ? (
+//                     <div className="flex items-center gap-2 shrink-0">
+//                       {/* Hide other actions while inviting */}
+//                       {!inviting && (
+//                         <>
+//                           {/* (Disabled) Rename icon placeholder */}
+//                           <button
+//                             type="button"
+//                             disabled={busy || creating}
+//                             className="text-sm px-2 py-1 hover:bg-gray-100 opacity-60"
+//                             title="Rename (coming soon)"
+//                             aria-disabled="true"
+//                           >
+//                             <FaPencilAlt className="w-5 h-5" />
+//                           </button>
+
+//                           {/* Owners: Share + Delete / Members: Unsubscribe */}
+//                           {isOwner(list) ? (
+//                             <>
+//                               {canInvite && (
+//                                 <ShareListInline
+//                                   listId={list.id}
+//                                   currentUserId={user.id}
+//                                   isOpen={inviting}
+//                                   onOpenChange={(open) =>
+//                                     setShareOpenId(open ? list.id : null)
+//                                   }
+//                                   render="trigger"
+//                                 />
+//                               )}
+//                               <button
+//                                 type="button"
+//                                 onClick={() => setConfirmId(list.id)}
+//                                 disabled={busy || creating}
+//                                 className="text-sm px-2 py-1 text-red-600 hover:bg-red-50"
+//                                 aria-label={`Delete list ${list.name || "Untitled"}`}
+//                                 title="Delete list"
+//                               >
+//                                 <FaTrashAlt className="w-5 h-5" />
+//                               </button>
+//                             </>
+//                           ) : (
+//                             // Non-owners: Unsubscribe
+//                             <button
+//                               type="button"
+//                               onClick={() => setConfirmUnsubId(list.id)}
+//                               disabled={busy || unsubscribingId === list.id}
+//                               className="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+//                               aria-label={`Unsubscribe from ${list.name || "Untitled"}`}
+//                               title="Leave this list"
+//                             >
+//                               {unsubscribingId === list.id ? "Leaving…" : "Unsubscribe"}
+//                             </button>
+//                           )}
+//                         </>
+//                       )}
+
+//                       {/* When inviting, keep actions minimal (close lives in the form below) */}
+//                       {inviting && canInvite && (
+//                         <ShareListInline
+//                           listId={list.id}
+//                           currentUserId={user.id}
+//                           isOpen={inviting}
+//                           onOpenChange={(open) =>
+//                             setShareOpenId(open ? list.id : null)
+//                           }
+//                           render="trigger"
+//                         />
+//                       )}
+//                     </div>
+//                   ) : (
+//                     // Owner delete confirmation
+//                     <div className="flex items-center gap-2">
+//                       <button
+//                         type="button"
+//                         onClick={() => {
+//                           setDeletingId(list.id);
+//                           handleDelete(list);
+//                         }}
+//                         disabled={busy || creating}
+//                         className={`text-sm px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 ${
+//                           isDeleting ? "opacity-70 cursor-not-allowed" : ""
+//                         }`}
+//                         title="This removes the list and its todos"
+//                       >
+//                         {isDeleting ? "Deleting…" : "Confirm"}
+//                       </button>
+//                       <button
+//                         type="button"
+//                         onClick={() => setConfirmId(null)}
+//                         disabled={busy || creating}
+//                         className="text-sm px-2 py-1 rounded border hover:bg-gray-50"
+//                         aria-label="Cancel delete"
+//                         title="Cancel"
+//                       >
+//                         <FaXmark />
+//                       </button>
+//                     </div>
+//                   )}
+//                 </div>
+
+//                 {/* Unsubscribe confirm (non-owner only) */}
+//                 {confirmUnsubId === list.id && canUnsubscribe(list) && (
+//                   <div className="mt-2 p-3 rounded border bg-amber-50">
+//                     <p className="text-center  mb-2 text-md font-bold">
+//                       ⚠️ Leave “{list.name || "Untitled"}”? 
+//                     </p>
+//                     <p className="text-center text-xs mb-2 pb-2">(You'll lose access to its items until re-invited.) </p>
+//                     <div className="flex gap-2 text-center justify-center">
+//                       <button
+//                         type="button"
+//                         onClick={() => setConfirmUnsubId(null)}
+//                         disabled={busy}
+//                         className="px-3 py-1 rounded border hover:bg-gray-50"
+//                       >
+//                         Cancel
+//                       </button>
+//                       <button
+//                         type="button"
+//                         onClick={() => handleUnsubscribe(list.id, user.id)}
+//                         disabled={busy}
+//                         className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+//                       >
+//                         {unsubscribingId === list.id ? "Leaving…" : "Confirm Unsubscribe"}
+//                       </button>
+//                     </div>
+//                   </div>
+//                 )}
+
+//                 {/* Invite form below the row (appears only when inviting) */}
+//                 {inviting && canInvite && (
+//                   <div className="mt-2">
+//                     <ShareListInline
+//                       listId={list.id}
+//                       currentUserId={user.id}
+//                       isOpen={true}
+//                       onOpenChange={(open) =>
+//                         setShareOpenId(open ? list.id : null)
+//                       }
+//                       onDone={() => setShareOpenId(null)}
+//                       render="form-below"
+//                     />
+//                   </div>
+//                 )}
+//               </div>
+//             );
+//           })}
+//         </div>
+//       </aside>
+//     </>
+//   );
+// }
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -5,6 +513,27 @@ import { toast } from "sonner";
 import ShareListInline from "@/components/ShareListInline";
 import { FaTrashAlt, FaPencilAlt } from "react-icons/fa";
 import { FaXmark } from "react-icons/fa6";
+
+function TypePicker({ value, onChange, disabled, id = "drawer-list-type" }) {
+  return (
+    <>
+      <label className="block text-sm font-semibold mb-1" htmlFor={id}>
+        List type
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        className="w-full border rounded px-3 py-2 mb-3"
+        disabled={disabled}
+      >
+        <option value="todo">Todo</option>
+        <option value="grocery">Grocery</option>
+        <option value="note">Note</option>
+      </select>
+    </>
+  );
+}
 
 export default function ManageListsDrawer({
   open,
@@ -24,6 +553,7 @@ export default function ManageListsDrawer({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createdThisSession, setCreatedThisSession] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState("todo");
   const [creating, setCreating] = useState(false);
 
   const panelRef = useRef(null);
@@ -39,14 +569,11 @@ export default function ManageListsDrawer({
 
   // Helper: is the current user the owner of this list?
   function isOwner(list) {
-    // Your rows already include created_by; prefer that.
     if (list?.created_by) return list.created_by === user.id;
-    // Fallback if your query hydrates role:
     if (list?._role) return list._role === "owner";
     return false;
   }
 
-  // Helper: can the current user unsubscribe from this list?
   function canUnsubscribe(list) {
     return !isOwner(list);
   }
@@ -94,17 +621,16 @@ export default function ManageListsDrawer({
     };
   }, [open, busy, creating]);
 
-  // Autofocus when the create form is revealed
   useEffect(() => {
     if (showCreateForm) setTimeout(() => createInputRef.current?.focus(), 0);
   }, [showCreateForm]);
 
-  // Session reset when drawer opens
   useEffect(() => {
     if (!open) return;
     setShowCreateForm(false);
     setCreatedThisSession(false);
     setNewName("");
+    setNewType("todo");
     setShareOpenId(null);
     setDeletingId(null);
     setConfirmId(null);
@@ -128,7 +654,7 @@ export default function ManageListsDrawer({
     setCreating(true);
     const { data: list, error } = await supabase
       .from("lists")
-      .insert([{ name, created_by: user.id }]) // trigger will add owner membership
+      .insert([{ name, created_by: user.id, type: newType }]) // ← include type
       .select()
       .single();
     setCreating(false);
@@ -141,6 +667,7 @@ export default function ManageListsDrawer({
 
     toast.success("List created");
     setNewName("");
+    setNewType("todo");
     setShowCreateForm(false);
     setCreatedThisSession(true);
     await onAfterCreate?.(list); // parent will refresh + select
@@ -151,14 +678,17 @@ export default function ManageListsDrawer({
     if (!user) return;
     setBusy(true);
 
-    // delete todos first (safer if FK isn't cascade)
-    const { error: tdErr } = await supabase
-      .from("todos")
-      .delete()
-      .eq("list_id", list.id);
-    if (tdErr) {
-      console.error("delete todos error:", tdErr);
-      toast.error("Could not delete todos for this list");
+    // In case FKs aren’t cascade everywhere, clean child tables explicitly
+    const deletions = [
+      supabase.from("todos").delete().eq("list_id", list.id),
+      supabase.from("grocery_items").delete().eq("list_id", list.id),
+      supabase.from("notes").delete().eq("list_id", list.id),
+    ];
+    const results = await Promise.all(deletions);
+    const childErr = results.find((r) => r.error)?.error;
+    if (childErr) {
+      console.error("delete child items error:", childErr);
+      toast.error("Could not remove list items");
       setBusy(false);
       return;
     }
@@ -182,7 +712,6 @@ export default function ManageListsDrawer({
     await onAfterDelete?.(list.id);
   }
 
-  // Owner display helper
   function ownerLabelFor(list, user) {
     if (!list) return "—";
     if (list.created_by === user.id) return "Me";
@@ -198,11 +727,10 @@ export default function ManageListsDrawer({
       const initial = l ? `${l[0].toUpperCase()}.` : "";
       return `${f} ${initial}`.trim();
     }
-    if (u) return u; // fallback to username if no names
+    if (u) return u;
     return "—";
   }
 
-  // Unsubscribe handler
   async function handleUnsubscribe(listId, userId) {
     try {
       setBusy(true);
@@ -224,10 +752,7 @@ export default function ManageListsDrawer({
       setConfirmUnsubId(null);
       setUnsubscribingId(null);
 
-      // Update parent (remove from local lists, maybe reset active)
       await onAfterDelete?.(listId);
-
-      // Optional: close the drawer after success
       handleClose();
     } finally {
       setBusy(false);
@@ -251,7 +776,7 @@ export default function ManageListsDrawer({
         aria-modal="true"
         aria-labelledby="manage-lists-title"
         className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-white shadow-2xl p-4 outline-none
-                   sm:left-auto sm:top-0 sm:bottom-0 sm:w-[380px] sm:rounded-none sm:right-0"
+                   sm:left-auto sm:top-0 sm:bottom-0 sm:w-[420px] sm:rounded-none sm:right-0"
         tabIndex={-1}
       >
         <div className="flex items-center justify-between mb-3">
@@ -302,13 +827,14 @@ export default function ManageListsDrawer({
               placeholder="e.g., Groceries, Trip Planning"
               disabled={creating}
             />
+
+            <TypePicker value={newType} onChange={setNewType} disabled={creating} />
+
             <div className="flex gap-2">
               <button
                 type="submit"
                 disabled={creating || !newName.trim()}
-                className={`${
-                  creating ? "opacity-75 cursor-not-allowed" : ""
-                } bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded`}
+                className={`${creating ? "opacity-75 cursor-not-allowed" : ""} bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded`}
               >
                 {creating ? "Creating…" : "Create List"}
               </button>
@@ -316,6 +842,7 @@ export default function ManageListsDrawer({
                 type="button"
                 onClick={() => {
                   setNewName("");
+                  setNewType("todo");
                   setShowCreateForm(false);
                 }}
                 disabled={creating}
@@ -348,84 +875,69 @@ export default function ManageListsDrawer({
                     <div className={`font-medium ${inviting ? "" : "truncate"}`}>
                       {list.name || "Untitled"}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      Owner: {ownerLabelFor(list, user)}
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span className="inline-flex items-center gap-1">
+                        Owner: {ownerLabelFor(list, user)}
+                      </span>
+                      {list?.type && (
+                        <span className="inline-block rounded-full border px-2 py-0.5 bg-gray-50">
+                          {list.type}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* Actions */}
                   {!isConfirmingDelete ? (
                     <div className="flex items-center gap-2 shrink-0">
-                      {/* Hide other actions while inviting */}
-                      {!inviting && (
+                      <button
+                        type="button"
+                        disabled={busy || creating}
+                        className="text-sm px-2 py-1 hover:bg-gray-100 opacity-60"
+                        title="Rename (coming soon)"
+                        aria-disabled="true"
+                      >
+                        <FaPencilAlt className="w-5 h-5" />
+                      </button>
+
+                      {isOwner(list) ? (
                         <>
-                          {/* (Disabled) Rename icon placeholder */}
+                          {canInvite && (
+                            <ShareListInline
+                              listId={list.id}
+                              currentUserId={user.id}
+                              isOpen={inviting}
+                              onOpenChange={(open) =>
+                                setShareOpenId(open ? list.id : null)
+                              }
+                              render="trigger"
+                            />
+                          )}
                           <button
                             type="button"
+                            onClick={() => setConfirmId(list.id)}
                             disabled={busy || creating}
-                            className="text-sm px-2 py-1 hover:bg-gray-100 opacity-60"
-                            title="Rename (coming soon)"
-                            aria-disabled="true"
+                            className="text-sm px-2 py-1 text-red-600 hover:bg-red-50"
+                            aria-label={`Delete list ${list.name || "Untitled"}`}
+                            title="Delete list"
                           >
-                            <FaPencilAlt className="w-5 h-5" />
+                            <FaTrashAlt className="w-5 h-5" />
                           </button>
-
-                          {/* Owners: Share + Delete / Members: Unsubscribe */}
-                          {isOwner(list) ? (
-                            <>
-                              {canInvite && (
-                                <ShareListInline
-                                  listId={list.id}
-                                  currentUserId={user.id}
-                                  isOpen={inviting}
-                                  onOpenChange={(open) =>
-                                    setShareOpenId(open ? list.id : null)
-                                  }
-                                  render="trigger"
-                                />
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => setConfirmId(list.id)}
-                                disabled={busy || creating}
-                                className="text-sm px-2 py-1 text-red-600 hover:bg-red-50"
-                                aria-label={`Delete list ${list.name || "Untitled"}`}
-                                title="Delete list"
-                              >
-                                <FaTrashAlt className="w-5 h-5" />
-                              </button>
-                            </>
-                          ) : (
-                            // Non-owners: Unsubscribe
-                            <button
-                              type="button"
-                              onClick={() => setConfirmUnsubId(list.id)}
-                              disabled={busy || unsubscribingId === list.id}
-                              className="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-                              aria-label={`Unsubscribe from ${list.name || "Untitled"}`}
-                              title="Leave this list"
-                            >
-                              {unsubscribingId === list.id ? "Leaving…" : "Unsubscribe"}
-                            </button>
-                          )}
                         </>
-                      )}
-
-                      {/* When inviting, keep actions minimal (close lives in the form below) */}
-                      {inviting && canInvite && (
-                        <ShareListInline
-                          listId={list.id}
-                          currentUserId={user.id}
-                          isOpen={inviting}
-                          onOpenChange={(open) =>
-                            setShareOpenId(open ? list.id : null)
-                          }
-                          render="trigger"
-                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmUnsubId(list.id)}
+                          disabled={busy || unsubscribingId === list.id}
+                          className="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                          aria-label={`Unsubscribe from ${list.name || "Untitled"}`}
+                          title="Leave this list"
+                        >
+                          {unsubscribingId === list.id ? "Leaving…" : "Unsubscribe"}
+                        </button>
                       )}
                     </div>
                   ) : (
-                    // Owner delete confirmation
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -437,7 +949,7 @@ export default function ManageListsDrawer({
                         className={`text-sm px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 ${
                           isDeleting ? "opacity-70 cursor-not-allowed" : ""
                         }`}
-                        title="This removes the list and its todos"
+                        title="This removes the list and its items"
                       >
                         {isDeleting ? "Deleting…" : "Confirm"}
                       </button>
@@ -455,13 +967,15 @@ export default function ManageListsDrawer({
                   )}
                 </div>
 
-                {/* Unsubscribe confirm (non-owner only) */}
+                {/* Unsubscribe confirm */}
                 {confirmUnsubId === list.id && canUnsubscribe(list) && (
                   <div className="mt-2 p-3 rounded border bg-amber-50">
                     <p className="text-center  mb-2 text-md font-bold">
-                      ⚠️ Leave “{list.name || "Untitled"}”? 
+                      ⚠️ Leave “{list.name || "Untitled"}”?
                     </p>
-                    <p className="text-center text-xs mb-2 pb-2">(You'll lose access to its items until re-invited.) </p>
+                    <p className="text-center text-xs mb-2 pb-2">
+                      (You'll lose access to its items until re-invited.)
+                    </p>
                     <div className="flex gap-2 text-center justify-center">
                       <button
                         type="button"
@@ -483,8 +997,8 @@ export default function ManageListsDrawer({
                   </div>
                 )}
 
-                {/* Invite form below the row (appears only when inviting) */}
-                {inviting && canInvite && (
+                {/* Invite form below the row */}
+                {shareOpenId === list.id && canInvite && (
                   <div className="mt-2">
                     <ShareListInline
                       listId={list.id}
