@@ -68,7 +68,7 @@ export default function TodoItem({ todo, onUpdate }) {
             {todo.title}
           </p>
 
-          {todo.priority && (
+          {/* {todo.priority && (
             <span
               className={`rounded px-1.5 py-0.5 text-[10px] ring-1 ${
                 todo.priority === "high"
@@ -81,7 +81,7 @@ export default function TodoItem({ todo, onUpdate }) {
             >
               {todo.priority}
             </span>
-          )}
+          )} */}
         </div>
 
         {todo.description && (
@@ -96,11 +96,25 @@ export default function TodoItem({ todo, onUpdate }) {
               Due {format(new Date(todo.due_date), "MMM d, yyyy")}
             </span>
           )}
-          {todo.created_at && (
+          {todo.priority && (
+            <span
+              className={`rounded px-1.5 py-0.5 text-[10px] ring-1 ${
+                todo.priority === "high"
+                  ? "bg-red-100 text-red-700 ring-red-200"
+                  : todo.priority === "medium"
+                  ? "bg-amber-100 text-amber-800 ring-amber-200"
+                  : "bg-gray-100 text-gray-700 ring-gray-200"
+              }`}
+              title={`Priority: ${todo.priority}`}
+            >
+              {todo.priority}
+            </span>
+          )}
+          {/* {todo.created_at && (
             <span title="Created at">
               · Created {format(new Date(todo.created_at), "MMM d, yyyy")}
             </span>
-          )}
+          )} */}
         </div>
       </div>
 
