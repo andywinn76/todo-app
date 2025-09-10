@@ -159,13 +159,16 @@ import TodoForm from "@/components/TodoForm";
 import TodoList from "@/components/TodoList";
 import GroceryList from "@/components/GroceryList";
 import NoteEditor from "@/components/NoteEditor";
+import ListActions from "@/components/ListActions";
 
 export default function Home() {
   const { user, userLoading } = useRequireAuth();
 
-  // 🔑 Pull list state from the provider
-  const { lists, activeListId } = useLists();
-  console.log(`Lists: ${lists}`)
+  // 🔑 Pull state from provider — include setters if your provider exposes them
+  const { lists, activeListId, setActiveListId, refreshLists } = useLists?.() ?? {
+    lists: [],
+    activeListId: null,
+  };
 
   const [todos, setTodos] = useState([]);
   const [isActive, setIsActive] = useState(false);
@@ -182,11 +185,9 @@ export default function Home() {
   );
 
   const activeListType = activeList?.type || "todo";
-  const activeListName = activeList
-    ? activeList.name
-    : "Click Manage to Add a List";
+  const activeListName = activeList ? activeList.name : "Click Manage to Add a List";
 
-  // Owner label (uses provider-enriched fields)
+  // Owner label
   const ownerFirst =
     activeList?.owner_first_name ||
     user?.user_metadata?.first_name ||
@@ -198,12 +199,10 @@ export default function Home() {
     user?.user_metadata?.full_name?.split(" ")?.[1] ||
     "";
   const ownerLabel = ownerFirst
-    ? `List Owner: ${ownerFirst} ${
-        ownerLast ? ownerLast[0].toUpperCase() + "." : ""
-      }`
+    ? `List Owner: ${ownerFirst} ${ownerLast ? ownerLast[0].toUpperCase() + "." : ""}`
     : null;
 
-  // Load todos for the active list (only when type = todo)
+  // Load todos for todo lists only
   const fetchTodos = async () => {
     if (!user || !hasValidActive || activeListType !== "todo") {
       setTodos([]);
@@ -231,7 +230,7 @@ export default function Home() {
       return;
     }
     fetchTodos();
-  }, [user, activeListId, activeListType, lists]); // re-run when selection or list set/type changes
+  }, [user, activeListId, activeListType, lists]);
 
   if (!user || userLoading) return <p className="p-6">Loading...</p>;
 
@@ -254,13 +253,37 @@ export default function Home() {
             </h1>
 
             {activeListId && (
-              <ShareListInline
-                listId={activeListId}
-                currentUserId={user.id}
-                isOpen={shareOpen}
-                onOpenChange={setShareOpen}
-                render="trigger"
-              />
+              <>
+                <ShareListInline
+                  listId={activeListId}
+                  currentUserId={user.id}
+                  isOpen={shareOpen}
+                  onOpenChange={setShareOpen}
+                  render="trigger"
+                />
+
+                {/* Delete (owner) / Unsubscribe (member) */}
+                <ListActions
+                  activeList={activeList}
+                  currentUserId={user.id}
+                  onAfterDelete={async (deletedId) => {
+                    // If you just deleted the active list, clear selection
+                    if (String(deletedId) === String(activeListId)) {
+                      setActiveListId?.(null);
+                    }
+                    // Optional: force a provider refresh if not auto-subscribed
+                    await refreshLists?.();
+                  }}
+                  onAfterUnsubscribe={async (leftId) => {
+                    // If you just left the active list, clear selection
+                    if (String(leftId) === String(activeListId)) {
+                      setActiveListId?.(null);
+                    }
+                    // Optional: refresh provider state so the selector updates
+                    await refreshLists?.();
+                  }}
+                />
+              </>
             )}
           </div>
 

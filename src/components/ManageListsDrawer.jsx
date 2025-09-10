@@ -507,12 +507,13 @@
 //   );
 // }
 "use client";
+
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import ShareListInline from "@/components/ShareListInline";
-import { FaTrashAlt, FaPencilAlt } from "react-icons/fa";
-import { FaXmark } from "react-icons/fa6";
+import { FaPencilAlt } from "react-icons/fa";
+import ListActions from "@/components/ListActions";
 
 function TypePicker({ value, onChange, disabled, id = "drawer-list-type" }) {
   return (
@@ -545,8 +546,6 @@ export default function ManageListsDrawer({
   onAfterCreate, // async (createdList) => void
   triggerRef, // ref to the "Manage" button (for focus return)
 }) {
-  const [deletingId, setDeletingId] = useState(null);
-  const [confirmId, setConfirmId] = useState(null);
   const [busy, setBusy] = useState(false);
 
   // Create form state
@@ -563,19 +562,29 @@ export default function ManageListsDrawer({
   // Sharing state (which list id is currently inviting)
   const [shareOpenId, setShareOpenId] = useState(null);
 
-  // Unsubscribe state (which list id is currently unsubscribing)
-  const [unsubscribingId, setUnsubscribingId] = useState(null);
-  const [confirmUnsubId, setConfirmUnsubId] = useState(null);
-
-  // Helper: is the current user the owner of this list?
+  // Helpers
   function isOwner(list) {
     if (list?.created_by) return list.created_by === user.id;
     if (list?._role) return list._role === "owner";
     return false;
   }
+  function ownerLabelFor(list, user) {
+    if (!list) return "—";
+    if (list.created_by === user.id) return "Me";
 
-  function canUnsubscribe(list) {
-    return !isOwner(list);
+    const f =
+      (list.owner_first_name ?? list.owner?.first_name ?? "").trim?.() || "";
+    const l =
+      (list.owner_last_name ?? list.owner?.last_name ?? "").trim?.() || "";
+    const u =
+      (list.owner_username ?? list.owner?.username ?? "").trim?.() || "";
+
+    if (f) {
+      const initial = l ? `${l[0].toUpperCase()}.` : "";
+      return `${f} ${initial}`.trim();
+    }
+    if (u) return u;
+    return "—";
   }
 
   // Focus trap + esc + body scroll lock
@@ -632,10 +641,6 @@ export default function ManageListsDrawer({
     setNewName("");
     setNewType("todo");
     setShareOpenId(null);
-    setDeletingId(null);
-    setConfirmId(null);
-    setConfirmUnsubId(null);
-    setUnsubscribingId(null);
   }, [open]);
 
   function handleClose() {
@@ -654,7 +659,7 @@ export default function ManageListsDrawer({
     setCreating(true);
     const { data: list, error } = await supabase
       .from("lists")
-      .insert([{ name, created_by: user.id, type: newType }]) // ← include type
+      .insert([{ name, created_by: user.id, type: newType }]) // include type
       .select()
       .single();
     setCreating(false);
@@ -670,94 +675,8 @@ export default function ManageListsDrawer({
     setNewType("todo");
     setShowCreateForm(false);
     setCreatedThisSession(true);
-    await onAfterCreate?.(list); // parent will refresh + select
+    await onAfterCreate?.(list); // parent refresh + select
     handleClose();
-  }
-
-  async function handleDelete(list) {
-    if (!user) return;
-    setBusy(true);
-
-    // In case FKs aren’t cascade everywhere, clean child tables explicitly
-    const deletions = [
-      supabase.from("todos").delete().eq("list_id", list.id),
-      supabase.from("grocery_items").delete().eq("list_id", list.id),
-      supabase.from("notes").delete().eq("list_id", list.id),
-    ];
-    const results = await Promise.all(deletions);
-    const childErr = results.find((r) => r.error)?.error;
-    if (childErr) {
-      console.error("delete child items error:", childErr);
-      toast.error("Could not remove list items");
-      setBusy(false);
-      return;
-    }
-
-    const { error: lsErr } = await supabase
-      .from("lists")
-      .delete()
-      .eq("id", list.id)
-      .eq("created_by", user.id); // creator-only
-    setBusy(false);
-
-    if (lsErr) {
-      console.error("delete list error:", lsErr);
-      toast.error("Could not delete list");
-      return;
-    }
-
-    toast.success(`Deleted “${list.name || "Untitled"}”`);
-    setConfirmId(null);
-    setDeletingId(null);
-    await onAfterDelete?.(list.id);
-  }
-
-  function ownerLabelFor(list, user) {
-    if (!list) return "—";
-    if (list.created_by === user.id) return "Me";
-
-    const f =
-      (list.owner_first_name ?? list.owner?.first_name ?? "").trim?.() || "";
-    const l =
-      (list.owner_last_name ?? list.owner?.last_name ?? "").trim?.() || "";
-    const u =
-      (list.owner_username ?? list.owner?.username ?? "").trim?.() || "";
-
-    if (f) {
-      const initial = l ? `${l[0].toUpperCase()}.` : "";
-      return `${f} ${initial}`.trim();
-    }
-    if (u) return u;
-    return "—";
-  }
-
-  async function handleUnsubscribe(listId, userId) {
-    try {
-      setBusy(true);
-      setUnsubscribingId(listId);
-
-      const { error } = await supabase
-        .from("list_members")
-        .delete()
-        .eq("list_id", listId)
-        .eq("user_id", userId);
-
-      if (error) {
-        console.error(error);
-        toast.error("Could not unsubscribe. Please try again.");
-        return;
-      }
-
-      toast.success("You left the list.");
-      setConfirmUnsubId(null);
-      setUnsubscribingId(null);
-
-      await onAfterDelete?.(listId);
-      handleClose();
-    } finally {
-      setBusy(false);
-      setUnsubscribingId(null);
-    }
   }
 
   if (!open) return null;
@@ -861,11 +780,8 @@ export default function ManageListsDrawer({
           )}
 
           {lists.map((list) => {
-            const isConfirmingDelete = confirmId === list.id;
-            const isDeleting = deletingId === list.id && busy;
             const inviting = shareOpenId === list.id;
-            const canInvite =
-              list?.created_by === user.id || list?._role === "owner";
+            const canInvite = isOwner(list);
 
             return (
               <div key={list.id} className="rounded border p-3">
@@ -887,118 +803,49 @@ export default function ManageListsDrawer({
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  {!isConfirmingDelete ? (
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        disabled={busy || creating}
-                        className="text-sm px-2 py-1 hover:bg-gray-100 opacity-60"
-                        title="Rename (coming soon)"
-                        aria-disabled="true"
-                      >
-                        <FaPencilAlt className="w-5 h-5" />
-                      </button>
+                  {/* Actions: Share + Delete/Unsubscribe via ListActions */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* (Disabled) rename placeholder */}
+                    <button
+                      type="button"
+                      disabled={busy || creating}
+                      className="text-sm px-2 py-1 hover:bg-gray-100 opacity-60"
+                      title="Rename (coming soon)"
+                      aria-disabled="true"
+                    >
+                      <FaPencilAlt className="w-5 h-5" />
+                    </button>
 
-                      {isOwner(list) ? (
-                        <>
-                          {canInvite && (
-                            <ShareListInline
-                              listId={list.id}
-                              currentUserId={user.id}
-                              isOpen={inviting}
-                              onOpenChange={(open) =>
-                                setShareOpenId(open ? list.id : null)
-                              }
-                              render="trigger"
-                            />
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setConfirmId(list.id)}
-                            disabled={busy || creating}
-                            className="text-sm px-2 py-1 text-red-600 hover:bg-red-50"
-                            aria-label={`Delete list ${list.name || "Untitled"}`}
-                            title="Delete list"
-                          >
-                            <FaTrashAlt className="w-5 h-5" />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmUnsubId(list.id)}
-                          disabled={busy || unsubscribingId === list.id}
-                          className="text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-                          aria-label={`Unsubscribe from ${list.name || "Untitled"}`}
-                          title="Leave this list"
-                        >
-                          {unsubscribingId === list.id ? "Leaving…" : "Unsubscribe"}
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDeletingId(list.id);
-                          handleDelete(list);
-                        }}
-                        disabled={busy || creating}
-                        className={`text-sm px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 ${
-                          isDeleting ? "opacity-70 cursor-not-allowed" : ""
-                        }`}
-                        title="This removes the list and its items"
-                      >
-                        {isDeleting ? "Deleting…" : "Confirm"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmId(null)}
-                        disabled={busy || creating}
-                        className="text-sm px-2 py-1 rounded border hover:bg-gray-50"
-                        aria-label="Cancel delete"
-                        title="Cancel"
-                      >
-                        <FaXmark />
-                      </button>
-                    </div>
-                  )}
+                    {/* Share trigger (owners only here) */}
+                    {canInvite && (
+                      <ShareListInline
+                        listId={list.id}
+                        currentUserId={user.id}
+                        isOpen={inviting}
+                        onOpenChange={(open) =>
+                          setShareOpenId(open ? list.id : null)
+                        }
+                        render="trigger"
+                      />
+                    )}
+
+                    {/* NEW: ListActions handles confirm + API + callbacks */}
+                    <ListActions
+                      activeList={list}
+                      currentUserId={user.id}
+                      onAfterDelete={async (deletedId) => {
+                        // Mirror old behavior: bubble up to parent to remove locally / reset active
+                        await onAfterDelete?.(deletedId);
+                      }}
+                      onAfterUnsubscribe={async (leftId) => {
+                        await onAfterDelete?.(leftId); // reuse parent handler to prune from list set
+                      }}
+                    />
+                  </div>
                 </div>
 
-                {/* Unsubscribe confirm */}
-                {confirmUnsubId === list.id && canUnsubscribe(list) && (
-                  <div className="mt-2 p-3 rounded border bg-amber-50">
-                    <p className="text-center  mb-2 text-md font-bold">
-                      ⚠️ Leave “{list.name || "Untitled"}”?
-                    </p>
-                    <p className="text-center text-xs mb-2 pb-2">
-                      (You'll lose access to its items until re-invited.)
-                    </p>
-                    <div className="flex gap-2 text-center justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setConfirmUnsubId(null)}
-                        disabled={busy}
-                        className="px-3 py-1 rounded border hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleUnsubscribe(list.id, user.id)}
-                        disabled={busy}
-                        className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {unsubscribingId === list.id ? "Leaving…" : "Confirm Unsubscribe"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Invite form below the row */}
-                {shareOpenId === list.id && canInvite && (
+                {/* Invite form below the row (appears when inviting) */}
+                {inviting && canInvite && (
                   <div className="mt-2">
                     <ShareListInline
                       listId={list.id}

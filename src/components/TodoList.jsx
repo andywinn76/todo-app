@@ -203,9 +203,9 @@ export default function TodoList() {
       </div>
 
       {loading ? (
-        <p className="text-gray-500">Loading todos...</p>
+        <p className="text-gray-500">Loading lists...</p>
       ) : todos.length === 0 ? (
-        <p className="text-gray-500">No todos yet.</p>
+        <p className="text-gray-500">No lists yet. Add a list using the button above.</p>
       ) : (
         <ul className="space-y-2">
           {todos.map((todo) => (
