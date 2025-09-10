@@ -4,6 +4,7 @@ import ConditionalHeader from "@/components/ConditionalHeader";
 import { ListsProvider } from "@/components/ListsProvider";
 import { Suspense } from "react";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/next"
 
 export const metadata = {
   title: "Lets Doooo It",
@@ -18,6 +19,7 @@ export default function RootLayout({ children }) {
             <ListsProvider>
               <ConditionalHeader />
               {children}
+              <Analytics />
               <Toaster
                 position="top-center"
                 toastOptions={{
