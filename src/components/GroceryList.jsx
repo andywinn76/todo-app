@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { FaTrashAlt } from "react-icons/fa";
@@ -10,6 +10,10 @@ export default function GroceryList({ user, listId }) {
   const [quantity, setQuantity] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(true);
+
+  // 🔑 Ref for the input field
+  const inputRef = useRef(null);
 
   async function load() {
     setLoading(true);
@@ -34,6 +38,13 @@ export default function GroceryList({ user, listId }) {
     load();
   }, [user, listId]);
 
+  useEffect(() => {
+    if (showForm) {
+      // slight delay ensures the element is visible before focusing
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [showForm]);
+
   async function addItem(e) {
     e.preventDefault();
     if (saving) return;
@@ -50,6 +61,10 @@ export default function GroceryList({ user, listId }) {
     }
     setName("");
     setQuantity("");
+
+    // 🔑 Refocus the input so user can type next item
+    requestAnimationFrame(() => inputRef.current?.focus());
+
     load();
   }
 
@@ -66,7 +81,10 @@ export default function GroceryList({ user, listId }) {
   }
 
   async function remove(id) {
-    const { error } = await supabase.from("grocery_items").delete().eq("id", id);
+    const { error } = await supabase
+      .from("grocery_items")
+      .delete()
+      .eq("id", id);
     if (error) {
       console.error(error);
       return toast.error("Failed to delete item");
@@ -77,45 +95,87 @@ export default function GroceryList({ user, listId }) {
   const uncheckedCount = items.filter((i) => !i.is_checked).length;
 
   return (
-    <section className="space-y-4">
-      <form onSubmit={addItem} className="flex flex-col sm:flex-row gap-2 bg-white p-4 rounded border shadow-sm">
-        <input
-          type="text"
-          placeholder="Add item (e.g., milk)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="flex-1 border rounded px-3 py-2"
-          disabled={saving}
-        />
-        <input
-          type="text"
-          placeholder="Qty (optional)"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          className="w-full sm:w-40 border rounded px-3 py-2"
-          disabled={saving}
-        />
-        <button
-          type="submit"
-          disabled={saving || !name.trim()}
-          className={`px-4 py-2 rounded font-semibold ${saving ? "opacity-70 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
-        >
-          {saving ? "Adding…" : "Add"}
-        </button>
-      </form>
+    <section className="space-y-2">
+      {!showForm && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="px-4 py-1 rounded border hover:bg-gray-50"
+          >
+            Add items
+          </button>
+        </div>
+      )}
+
+      {/* Collapsible panel that contains the form */}
+      <div
+        id="grocery-form-panel"
+        className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+          showForm ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <form
+            onSubmit={addItem}
+            className="flex flex-col sm:flex-row gap-2 bg-white p-4"
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Add item (e.g., milk)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="flex-1 border rounded px-3 py-2"
+              readOnly={saving}
+              autoFocus
+            />
+            <input
+              type="text"
+              placeholder="Qty (optional)"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="w-full sm:w-40 border rounded px-3 py-2"
+              readOnly={saving}
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={saving || !name.trim()}
+                className={`px-4 py-1 rounded font-semibold ${
+                  saving
+                    ? "opacity-70 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
+              >
+                {saving ? "Adding…" : "Add"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-4 py-1 rounded border hover:bg-gray-50 text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <div className="text-sm text-gray-600">Remaining: {uncheckedCount}</div>
 
       {loading ? (
         <div>Loading…</div>
       ) : items.length === 0 ? (
-        <div className="text-gray-600">No items yet.</div>
+        <div className="text-gray-700 text-xl">No items yet.</div>
       ) : (
         <ul className="space-y-2">
           {items.map((item) => (
             <li
               key={item.id}
-              className={`p-2 border rounded flex items-center gap-3 ${item.is_checked ? "bg-green-50" : "bg-white"}`}
+              className={`p-2 border rounded flex items-center gap-3 ${
+                item.is_checked ? "bg-green-50" : "bg-white"
+              }`}
             >
               <input
                 type="checkbox"
@@ -124,11 +184,17 @@ export default function GroceryList({ user, listId }) {
                 aria-label={item.is_checked ? "Uncheck item" : "Check item"}
               />
               <div className="flex-1 min-w-0">
-                <span className={`truncate ${item.is_checked ? "line-through text-gray-500" : ""}`}>
+                <span
+                  className={`truncate ${
+                    item.is_checked ? "line-through text-gray-500" : ""
+                  }`}
+                >
                   {item.name}
                 </span>
                 {item.quantity && (
-                  <span className="ml-2 text-xs text-gray-500">({item.quantity})</span>
+                  <span className="ml-2 text-xs text-gray-500">
+                    ({item.quantity})
+                  </span>
                 )}
               </div>
               <button
