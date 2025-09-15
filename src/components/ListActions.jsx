@@ -28,7 +28,8 @@ export default function ListActions({
   // ✅ Robust owner check for your data shapes
   const isOwner = (() => {
     const cid = String(currentUserId ?? "");
-    const createdBy = activeList?.created_by != null ? String(activeList.created_by) : null;
+    const createdBy =
+      activeList?.created_by != null ? String(activeList.created_by) : null;
     const ownerId =
       activeList?.owner_id != null
         ? String(activeList.owner_id)
@@ -42,14 +43,19 @@ export default function ListActions({
   const btnBase =
     "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed";
   const btnSm = size === "sm" ? "h-7" : "h-8";
+  const btnMed = size === "md" ? "h-12" : "h-8";
   const danger = "hover:bg-red-100 text-red-700";
   const warn = "border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700";
 
   async function handleDelete() {
-    if (!window.confirm(`Delete “${activeList.name}”? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete “${activeList.name}”? This cannot be undone.`))
+      return;
     try {
       setBusy(true);
-      const { error } = await supabase.from("lists").delete().eq("id", activeList.id);
+      const { error } = await supabase
+        .from("lists")
+        .delete()
+        .eq("id", activeList.id);
       if (error) throw error;
       toast.success("List deleted.");
       await onAfterDelete?.(activeList.id);
@@ -62,7 +68,10 @@ export default function ListActions({
   }
 
   async function handleUnsubscribe() {
-    if (!window.confirm(`Leave “${activeList.name}”? You’ll lose access to it.`)) return;
+    if (
+      !window.confirm(`Leave “${activeList.name}”? You will lose access to it.`)
+    )
+      return;
     try {
       setBusy(true);
       const { error } = await supabase
@@ -70,7 +79,7 @@ export default function ListActions({
         .delete()
         .match({ list_id: activeList.id, user_id: currentUserId });
       if (error) throw error;
-      toast.success("You’ve left the list.");
+      toast.success("You've left the list.");
       await onAfterUnsubscribe?.(activeList.id);
     } catch (err) {
       console.error(err);
@@ -83,7 +92,6 @@ export default function ListActions({
   return (
     <div className="flex items-center gap-2">
       {isOwner ? (
-        
         <button
           type="button"
           onClick={handleDelete}
@@ -98,11 +106,11 @@ export default function ListActions({
           type="button"
           onClick={handleUnsubscribe}
           disabled={busy}
-          className={`${btnBase} ${btnSm} ${warn}`}
+          className={` ${warn}`}
           title="Leave this list"
         >
-          <FaUserMinus className="shrink-0" />
-          <span className="hidden sm:inline">Unsubscribe</span>
+          <FaUserMinus className="w-5 h-5" />
+          {/* <span className="hidden sm:inline">Unsubscribe</span> */}
         </button>
       )}
     </div>

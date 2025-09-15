@@ -1,178 +1,31 @@
-// // src/app/page.jsx
-// "use client";
-
-// import { useEffect, useState } from "react";
-// import { supabase } from "@/lib/supabaseClient";
-// import useRequireAuth from "@/hooks/useRequireAuth";
-// import { useLists } from "@/components/ListsProvider";
-// import ListSelector from "@/components/ListSelector";
-// import ShareListInline from "@/components/ShareListInline";
-// import TodoForm from "@/components/TodoForm";
-// import TodoList from "@/components/TodoList";
-
-// export default function Home() {
-//   const { user, userLoading } = useRequireAuth();
-
-//   // 🔑 Pull list state from the provider
-//   const { lists, activeListId } = useLists();
-
-//   const [todos, setTodos] = useState([]);
-//   const [isActive, setIsActive] = useState(false);
-//   const [shareOpen, setShareOpen] = useState(false);
-
-//   const hasValidActive =
-//     activeListId != null &&
-//     activeListId !== "" &&
-//     lists.some((l) => String(l.id) === String(activeListId));
-
-//   const activeList = lists.find((l) => String(l.id) === String(activeListId));
-//   const activeListName = activeList
-//     ? activeList.name
-//     : "Click Manage to Add a List";
-
-//   // Owner label (uses provider-enriched fields)
-//   const ownerFirst =
-//     activeList?.owner_first_name ||
-//     user?.user_metadata?.first_name ||
-//     user?.user_metadata?.full_name?.split(" ")?.[0] ||
-//     "";
-//   const ownerLast =
-//     activeList?.owner_last_name ||
-//     user?.user_metadata?.last_name ||
-//     user?.user_metadata?.full_name?.split(" ")?.[1] ||
-//     "";
-//   const ownerLabel = ownerFirst
-//     ? `List Owner: ${ownerFirst} ${
-//         ownerLast ? ownerLast[0].toUpperCase() + "." : ""
-//       }`
-//     : null;
-
-//   // Load todos for the active list
-//   const fetchTodos = async () => {
-//     if (!user || !hasValidActive) {
-//       setTodos([]);
-//       return;
-//     }
-//     const { data, error } = await supabase
-//       .from("todos")
-//       .select("*")
-//       .eq("list_id", String(activeListId))
-//       .order("due_date", { ascending: true });
-
-//     if (error) {
-//       console.error("Error loading todos:", error);
-//       setTodos([]);
-//       return;
-//     }
-//     setTodos(data || []);
-//   };
-
-//   useEffect(() => {
-//     if (!user) return;
-//     if (!hasValidActive) {
-//       setTodos([]);
-//       return;
-//     }
-//     fetchTodos();
-//   }, [user, activeListId, lists, hasValidActive]); // re-run when selection or list set changes
-
-//   if (!user || userLoading) return <p className="p-6">Loading...</p>;
-
-//   return (
-//     <main className="p-6">
-//       {/* Provider-backed selector (no list state props needed) */}
-//       <ListSelector user={user} />
-
-//       <div className="flex items-start justify-between gap-4 mb-6">
-//         {/* LEFT */}
-//         <div className="flex-1 min-w-0">
-//           <div className="flex items-center gap-2">
-//             <h1 className="text-2xl font-bold truncate">{activeListName}</h1>
-
-//             {activeListId && (
-//               <ShareListInline
-//                 listId={activeListId}
-//                 currentUserId={user.id}
-//                 isOpen={shareOpen}
-//                 onOpenChange={setShareOpen}
-//                 render="trigger"
-//               />
-//             )}
-//           </div>
-
-//           {activeListId && (
-//             <ShareListInline
-//               listId={activeListId}
-//               currentUserId={user.id}
-//               isOpen={shareOpen}
-//               onOpenChange={setShareOpen}
-//               onDone={() => setShareOpen(false)}
-//               render="form-below"
-//             />
-//           )}
-
-//           {lists.length > 0 && ownerLabel && (
-//             <p className="text-sm text-gray-500 mt-1 truncate">{ownerLabel}</p>
-//           )}
-//         </div>
-
-//         {/* RIGHT */}
-//         {hasValidActive && (
-//           <div className="shrink-0">
-//             <button
-//               onClick={() => setIsActive((v) => !v)}
-//               className={`px-4 py-2 rounded font-semibold border ${
-//                 isActive
-//                   ? "bg-gray-200 hover:bg-gray-300"
-//                   : "bg-green-500 hover:bg-green-600 text-white"
-//               }`}
-//               aria-expanded={isActive}
-//             >
-//               {isActive ? "Cancel" : "Add Todo"}
-//             </button>
-//           </div>
-//         )}
-//       </div>
-
-//       {isActive && activeListId && (
-//         <TodoForm
-//           user={user}
-//           onTodoAdded={fetchTodos}
-//           isActive={isActive}
-//           setIsActive={setIsActive}
-//         />
-//       )}
-
-//       <TodoList user={user} todos={todos} onRefresh={fetchTodos} />
-//     </main>
-//   );
-// }
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import useRequireAuth from "@/hooks/useRequireAuth";
 import { useLists } from "@/components/ListsProvider";
-import ListSelector from "@/components/ListSelector";
 import ShareListInline from "@/components/ShareListInline";
 import TodoForm from "@/components/TodoForm";
 import TodoList from "@/components/TodoList";
 import GroceryList from "@/components/GroceryList";
 import NoteEditor from "@/components/NoteEditor";
 import ListActions from "@/components/ListActions";
+import ManageListsDrawer from "@/components/ManageListsDrawer";
+import ListTitleSwitcher from "@/components/ListTitleSwitcher";
+import { TYPE_CONFIG } from "@/lib/typeConfig";
 
 export default function Home() {
   const { user, userLoading } = useRequireAuth();
-
-  // 🔑 Pull state from provider — include setters if your provider exposes them
-  const { lists, activeListId, setActiveListId, refreshLists } = useLists?.() ?? {
-    lists: [],
-    activeListId: null,
-  };
+  const { lists, activeListId, setActiveListId, refreshLists } =
+    useLists?.() ?? {
+      lists: [],
+      activeListId: null,
+    };
 
   const [todos, setTodos] = useState([]);
-  const [isActive, setIsActive] = useState(false);
+  const [addOpen, setAddOpen] = useState(false); // unified "Add" state across types
   const [shareOpen, setShareOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
 
   const hasValidActive =
     activeListId != null &&
@@ -185,7 +38,10 @@ export default function Home() {
   );
 
   const activeListType = activeList?.type || "todo";
-  const activeListName = activeList ? activeList.name : "Click Manage to Add a List";
+  const activeType = activeList?.type ?? null;
+
+  // 💡 Type registry drives header button text/visibility
+  const cfg = TYPE_CONFIG[activeListType] || {};
 
   // Owner label
   const ownerFirst =
@@ -199,7 +55,9 @@ export default function Home() {
     user?.user_metadata?.full_name?.split(" ")?.[1] ||
     "";
   const ownerLabel = ownerFirst
-    ? `List Owner: ${ownerFirst} ${ownerLast ? ownerLast[0].toUpperCase() + "." : ""}`
+    ? `List Owner: ${ownerFirst} ${
+        ownerLast ? ownerLast[0].toUpperCase() + "." : ""
+      }`
     : null;
 
   // Load todos for todo lists only
@@ -223,6 +81,13 @@ export default function Home() {
     setTodos(data || []);
   };
 
+  // Refresh lists on mount / user change
+  useEffect(() => {
+    if (!user) return;
+    refreshLists?.();
+  }, [user, refreshLists]);
+
+  // Fetch todos when selection/type changes (todo only)
   useEffect(() => {
     if (!user) return;
     if (!hasValidActive || activeListType !== "todo") {
@@ -236,21 +101,13 @@ export default function Home() {
 
   return (
     <main className="p-6">
-      {/* Provider-backed selector */}
-      <ListSelector user={user} />
-
+      {/* Header row */}
       <div className="flex items-start justify-between gap-4 mb-6">
         {/* LEFT */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold truncate">
-              {activeListName}
-              {activeList?.type && (
-                <span className="ml-2 text-sm font-normal text-gray-500 align-middle">
-                  • {activeList.type}
-                </span>
-              )}
-            </h1>
+            {/* Title opens Manage drawer */}
+            <ListTitleSwitcher onOpenManage={() => setManageOpen(true)} />
 
             {activeListId && (
               <>
@@ -267,19 +124,15 @@ export default function Home() {
                   activeList={activeList}
                   currentUserId={user.id}
                   onAfterDelete={async (deletedId) => {
-                    // If you just deleted the active list, clear selection
                     if (String(deletedId) === String(activeListId)) {
                       setActiveListId?.(null);
                     }
-                    // Optional: force a provider refresh if not auto-subscribed
                     await refreshLists?.();
                   }}
                   onAfterUnsubscribe={async (leftId) => {
-                    // If you just left the active list, clear selection
                     if (String(leftId) === String(activeListId)) {
                       setActiveListId?.(null);
                     }
-                    // Optional: refresh provider state so the selector updates
                     await refreshLists?.();
                   }}
                 />
@@ -298,24 +151,29 @@ export default function Home() {
             />
           )}
 
-          {lists.length > 0 && ownerLabel && (
-            <p className="text-sm text-gray-500 mt-1 truncate">{ownerLabel}</p>
+          {/* Type • Owner (type first per your preference) */}
+          {lists.length > 0 && (activeType || ownerLabel) && (
+            <p className="text-sm text-gray-500 mt-1 truncate">
+              {activeType ? <>Type: {activeType}</> : null}
+              {activeType && ownerLabel ? " • " : null}
+              {ownerLabel || null}
+            </p>
           )}
         </div>
 
-        {/* RIGHT: "Add Todo" only for todo lists */}
-        {hasValidActive && activeListType === "todo" && (
+        {/* RIGHT: Unified header Add button (driven by TYPE_CONFIG) */}
+        {hasValidActive && cfg.supportsAdd && (
           <div className="shrink-0">
             <button
-              onClick={() => setIsActive((v) => !v)}
+              onClick={() => setAddOpen((v) => !v)}
               className={`px-4 py-2 rounded font-semibold border ${
-                isActive
+                addOpen
                   ? "bg-gray-200 hover:bg-gray-300"
                   : "bg-green-500 hover:bg-green-600 text-white"
               }`}
-              aria-expanded={isActive}
+              aria-expanded={addOpen}
             >
-              {isActive ? "Cancel" : "Add Todo"}
+              {addOpen ? "Cancel" : cfg.addLabel || "Add"}
             </button>
           </div>
         )}
@@ -323,24 +181,54 @@ export default function Home() {
 
       {/* Body switches by list type */}
       {!hasValidActive ? (
-        <div className="text-gray-600">Select or create a list to get started.</div>
+        <div className="text-gray-600">
+          Select or create a list to get started.
+        </div>
       ) : activeListType === "todo" ? (
         <>
-          {isActive && activeListId && (
+          {addOpen && activeListId && (
             <TodoForm
               user={user}
               onTodoAdded={fetchTodos}
-              isActive={isActive}
-              setIsActive={setIsActive}
+              isActive={addOpen}
+              setIsActive={setAddOpen}
             />
           )}
           <TodoList user={user} todos={todos} onRefresh={fetchTodos} />
         </>
       ) : activeListType === "grocery" ? (
-        <GroceryList user={user} listId={activeListId} />
+        // Wire GroceryList to the unified header button
+        <GroceryList
+          user={user}
+          listId={activeListId}
+          open={addOpen}
+          onOpenChange={setAddOpen}
+        />
       ) : (
+        // Notes: supportsAdd=false for now (no header button)
         <NoteEditor user={user} listId={activeListId} />
       )}
+
+      {/* Drawer lives here so the TitleSwitcher can open it */}
+      <ManageListsDrawer
+        open={manageOpen}
+        onClose={() => setManageOpen(false)}
+        user={user}
+        lists={lists}
+        setLists={() => {}}
+        triggerRef={{ current: null }}
+        onAfterCreate={async (created) => {
+          const updated = await refreshLists?.();
+          if (created?.id) setActiveListId?.(created.id);
+        }}
+        onAfterDelete={async (deletedId) => {
+          const updated = await refreshLists?.();
+          if (String(deletedId) === String(activeListId)) {
+            if (updated?.length) setActiveListId?.(updated[0].id);
+            else setActiveListId?.(null);
+          }
+        }}
+      />
     </main>
   );
 }

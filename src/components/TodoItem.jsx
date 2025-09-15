@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import DeleteIconButton from "./DeleteIconButton";
 
 export default function TodoItem({ todo, onUpdate }) {
   const [busy, setBusy] = useState(false);
@@ -67,21 +68,6 @@ export default function TodoItem({ todo, onUpdate }) {
           >
             {todo.title}
           </p>
-
-          {/* {todo.priority && (
-            <span
-              className={`rounded px-1.5 py-0.5 text-[10px] ring-1 ${
-                todo.priority === "high"
-                  ? "bg-red-100 text-red-700 ring-red-200"
-                  : todo.priority === "medium"
-                  ? "bg-amber-100 text-amber-800 ring-amber-200"
-                  : "bg-gray-100 text-gray-700 ring-gray-200"
-              }`}
-              title={`Priority: ${todo.priority}`}
-            >
-              {todo.priority}
-            </span>
-          )} */}
         </div>
 
         {todo.description && (
@@ -110,23 +96,17 @@ export default function TodoItem({ todo, onUpdate }) {
               {todo.priority}
             </span>
           )}
-          {/* {todo.created_at && (
-            <span title="Created at">
-              · Created {format(new Date(todo.created_at), "MMM d, yyyy")}
-            </span>
-          )} */}
         </div>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        {/* Small edit hook if you decide to add inline editing later */}
-        <button
+        {/* Small edit hook if I decide to add inline editing later */}
+        <DeleteIconButton
           onClick={deleteTodo}
           disabled={busy}
-          className="rounded bg-red-50 px-2 py-1 text-xs text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"
-        >
-          Delete
-        </button>
+          title="Delete item"
+          aria-label="Delete item"
+        />
       </div>
     </li>
   );

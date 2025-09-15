@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { sendInvite } from "@/lib/invites";
-import { FaUserPlus, FaTimes } from "react-icons/fa";
 import { FaShareAlt } from "react-icons/fa";
 import { FaXmark } from "react-icons/fa6";
 

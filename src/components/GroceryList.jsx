@@ -1,21 +1,38 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
-import { FaTrashAlt } from "react-icons/fa";
+import DeleteIconButton from "@/components/DeleteIconButton";
 
-export default function GroceryList({ user, listId }) {
+/**
+ * Props:
+ * - user
+ * - listId
+ * - open?: boolean                // optional: controlled open state
+ * - onOpenChange?: (open:boolean) // optional: controlled change handler
+ */
+export default function GroceryList({ user, listId, open, onOpenChange }) {
+  const [busy, setBusy] = useState(false);
   const [items, setItems] = useState([]);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showForm, setShowForm] = useState(true);
+
+  // If `open` is undefined, we manage our own internal state.
+  const isControlled = open !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const showForm = isControlled ? open : internalOpen;
+  const setShowForm = (next) => {
+    if (isControlled) onOpenChange?.(next);
+    else setInternalOpen(next);
+  };
 
   // 🔑 Ref for the input field
   const inputRef = useRef(null);
 
-  async function load() {
+  const load = useCallback(async () => {
+    if (!listId) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("grocery_items")
@@ -31,41 +48,44 @@ export default function GroceryList({ user, listId }) {
       return;
     }
     setItems(data || []);
-  }
+  }, [listId]);
 
   useEffect(() => {
     if (!user || !listId) return;
     load();
-  }, [user, listId]);
+  }, [user, listId, load]);
 
+  // Focus when the panel opens
   useEffect(() => {
     if (showForm) {
-      // slight delay ensures the element is visible before focusing
-      setTimeout(() => inputRef.current?.focus(), 0);
+      const t = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(t);
     }
   }, [showForm]);
 
   async function addItem(e) {
     e.preventDefault();
     if (saving) return;
+
     const trimmed = (name || "").trim();
     if (!trimmed) return toast.error("Enter an item name");
+
     setSaving(true);
     const { error } = await supabase
       .from("grocery_items")
       .insert([{ list_id: listId, name: trimmed, quantity: quantity || null }]);
     setSaving(false);
+
     if (error) {
       console.error(error);
       return toast.error("Failed to add item");
     }
+
+    // Clear fields, reload, then re-focus input so user can add quickly.
     setName("");
     setQuantity("");
-
-    // 🔑 Refocus the input so user can type next item
-    requestAnimationFrame(() => inputRef.current?.focus());
-
-    load();
+    await load();
+    setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   async function toggle(id, checked) {
@@ -81,6 +101,7 @@ export default function GroceryList({ user, listId }) {
   }
 
   async function remove(id) {
+    setBusy(true);
     const { error } = await supabase
       .from("grocery_items")
       .delete()
@@ -89,6 +110,7 @@ export default function GroceryList({ user, listId }) {
       console.error(error);
       return toast.error("Failed to delete item");
     }
+    setBusy(false);
     load();
   }
 
@@ -96,8 +118,8 @@ export default function GroceryList({ user, listId }) {
 
   return (
     <section className="space-y-2">
-      {!showForm && (
-        <div className="flex justify-end">
+      {!isControlled && !showForm && (
+        <div className="flex justify-start">
           <button
             type="button"
             onClick={() => setShowForm(true)}
@@ -119,6 +141,9 @@ export default function GroceryList({ user, listId }) {
           <form
             onSubmit={addItem}
             className="flex flex-col sm:flex-row gap-2 bg-white p-4"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setShowForm(false);
+            }}
           >
             <input
               ref={inputRef}
@@ -197,14 +222,12 @@ export default function GroceryList({ user, listId }) {
                   </span>
                 )}
               </div>
-              <button
+              <DeleteIconButton
                 onClick={() => remove(item.id)}
-                className="p-2 rounded hover:bg-gray-100"
+                disabled={busy}
                 title="Delete item"
                 aria-label="Delete item"
-              >
-                <FaTrashAlt />
-              </button>
+              />
             </li>
           ))}
         </ul>

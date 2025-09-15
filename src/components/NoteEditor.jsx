@@ -37,36 +37,39 @@ export default function NoteEditor({ user, listId }) {
     };
   }, [user, listId, load]);
 
-  const doSave = useCallback(async (content) => {
-    setSaving(true);
-    try {
-      if (note?.id) {
-        const { data, error } = await supabase
-          .from("notes")
-          .update({ body: content, updated_by: user.id })
-          .eq("id", note.id)
-          .select()
-          .single();
-        if (error) throw error;
-        setNote(data);
-        setLastSavedAt(data.updated_at);
-      } else {
-        const { data, error } = await supabase
-          .from("notes")
-          .insert([{ list_id: listId, body: content, updated_by: user.id }])
-          .select()
-          .single();
-        if (error) throw error;
-        setNote(data);
-        setLastSavedAt(data.updated_at);
+  const doSave = useCallback(
+    async (content) => {
+      setSaving(true);
+      try {
+        if (note?.id) {
+          const { data, error } = await supabase
+            .from("notes")
+            .update({ body: content, updated_by: user.id })
+            .eq("id", note.id)
+            .select()
+            .single();
+          if (error) throw error;
+          setNote(data);
+          setLastSavedAt(data.updated_at);
+        } else {
+          const { data, error } = await supabase
+            .from("notes")
+            .insert([{ list_id: listId, body: content, updated_by: user.id }])
+            .select()
+            .single();
+          if (error) throw error;
+          setNote(data);
+          setLastSavedAt(data.updated_at);
+        }
+      } catch (e) {
+        console.error(e);
+        toast.error("Failed to save note");
+      } finally {
+        setSaving(false);
       }
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to save note");
-    } finally {
-      setSaving(false);
-    }
-  }, [note, listId, user?.id]);
+    },
+    [note, listId, user?.id]
+  );
 
   function onChange(e) {
     const value = e.target.value;
@@ -94,16 +97,16 @@ export default function NoteEditor({ user, listId }) {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-lg">Notes</h2>
-        <div className="text-sm text-gray-500">{subtitle}</div>
-      </div>
       <textarea
         value={body}
         onChange={onChange}
         placeholder="Write your notes… (Enter for a new line)"
         className="w-full min-h-[280px] border rounded p-3 leading-6"
       />
+      <div className="flex items-center justify-between"> 
+      {/*Autosaving notation */}
+        <div className="text-sm text-gray-500">{subtitle}</div>
+      </div>
       <div className="flex gap-2">
         <button
           type="button"
