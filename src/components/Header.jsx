@@ -38,8 +38,14 @@ export default function Header({ children }) {
 
   return (
     <header className="flex items-center justify-between bg-gray-100 p-4 border-b">
-      <Logo type="responsive" size="header" className="ml-2 sm:ml-4" priority />
-
+      <Link href="/" aria-label="Go to home page" title="Go to home page">
+        <Logo
+          type="responsive"
+          size="header"
+          className="ml-2 sm:ml-4"
+          priority
+        />
+      </Link>
       <div className="flex items-center gap-2 sm:gap-4">
         {/* Bell notification for invites */}
         <InvitesBell
@@ -49,7 +55,7 @@ export default function Header({ children }) {
             await refreshLists?.();
 
             // 2) Set the newly joined list active
-            setActiveListId(listId); 
+            setActiveListId(listId);
 
             // 3) (Optional) If your todos don’t auto-fetch on activeList change:
             // await fetchTodosForList(listId);
