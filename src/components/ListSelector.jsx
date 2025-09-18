@@ -1,4 +1,3 @@
-
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -9,14 +8,14 @@ import { createList } from "@/lib/lists";
 function TypePicker({ value, onChange, disabled, id = "list-type" }) {
   return (
     <>
-      <label className="block text-sm font-semibold mb-1" htmlFor={id}>
+      <label className="mb-1 block text-sm font-semibold" htmlFor={id}>
         List type
       </label>
       <select
         id={id}
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
-        className="w-full border rounded px-3 py-2 mb-3"
+        className="mb-3 w-full rounded border px-3 py-2"
         disabled={disabled}
       >
         <option value="todo">Todo</option>
@@ -28,7 +27,8 @@ function TypePicker({ value, onChange, disabled, id = "list-type" }) {
 }
 
 export default function ListSelector({ user }) {
-  const { lists, setLists, activeListId, setActiveListId, refreshLists } = useLists();
+  const { lists, setLists, activeListId, setActiveListId, refreshLists } =
+    useLists();
 
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
@@ -75,11 +75,9 @@ export default function ListSelector({ user }) {
       return;
     }
 
-    // Refresh so dropdown has new option, then activate it
     await refreshLists();
     setActiveListId(list.id);
 
-    // reset form
     setNewName("");
     setNewType("todo");
     setShowForm(false);
@@ -94,15 +92,21 @@ export default function ListSelector({ user }) {
 
   return (
     <div className="mb-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="flex items-center gap-2">
+      {/* Row: select grows, buttons never shrink */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Make the select the flexible piece */}
+        <div className="min-w-0 flex-1">
           <select
             value={activeListId ?? ""}
             onChange={(e) => {
               const v = e.target.value;
               setActiveListId(v === "" ? null : String(v));
             }}
-            className="border rounded px-2 py-1 min-w-[12rem]"
+            title={
+              lists.find((l) => String(l.id) === String(activeListId))?.name ??
+              ""
+            }
+            className="w-full truncate rounded border px-2 py-1"
           >
             {lists.map((l) => (
               <option key={l.id} value={l.id}>
@@ -110,19 +114,21 @@ export default function ListSelector({ user }) {
               </option>
             ))}
           </select>
+        </div>
 
+        {/* Controls: never shrink or get pushed off */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setManageOpen(true)}
-            className="border text-sm font-semibold px-3 py-1 rounded hover:bg-gray-50"
+            className="rounded border px-3 py-1 text-sm font-semibold hover:bg-gray-50"
             ref={manageBtnRef}
           >
             Manage
           </button>
-
           <button
             type="button"
-            className="border text-sm px-3 py-1 rounded hover:bg-gray-50"
+            className="rounded border px-3 py-1 text-sm hover:bg-gray-50"
             onClick={() => setShowForm((v) => !v)}
           >
             New
@@ -135,7 +141,7 @@ export default function ListSelector({ user }) {
           onSubmit={handleCreate}
           className="mt-3 rounded border bg-white p-3 shadow-sm"
         >
-          <label className="block text-sm font-semibold mb-1">
+          <label className="mb-1 block text-sm font-semibold">
             New list name
           </label>
           <input
@@ -143,25 +149,31 @@ export default function ListSelector({ user }) {
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            className="w-full border rounded px-3 py-2 mb-3"
+            className="mb-3 w-full rounded border px-3 py-2"
             placeholder="e.g., Groceries, Trip Planning"
             disabled={creating}
           />
 
-          <TypePicker value={newType} onChange={setNewType} disabled={creating} />
+          <TypePicker
+            value={newType}
+            onChange={setNewType}
+            disabled={creating}
+          />
 
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={creating || !newName.trim()}
-              className={`${creating ? "opacity-75 cursor-not-allowed" : ""} bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded`}
+              className={`${
+                creating ? "cursor-not-allowed opacity-75" : ""
+              } rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700`}
             >
               {creating ? "Creating…" : "Create List"}
             </button>
             <button
               type="button"
               onClick={handleCancel}
-              className="border px-3 py-2 rounded hover:bg-gray-50"
+              className="rounded border px-3 py-2 hover:bg-gray-50"
               disabled={creating}
             >
               Cancel

@@ -102,40 +102,47 @@ export default function Home() {
   return (
     <main className="p-6">
       {/* Header row */}
-      <div className="flex items-start justify-between gap-4 mb-6">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         {/* LEFT */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            {/* Title opens Manage drawer */}
-            <ListTitleSwitcher onOpenManage={() => setManageOpen(true)} />
+        <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex items-center gap-2">
+            {/* Title: allow grow, clamp with ellipsis */}
+            <div className="min-w-0 flex-1">
+              {/* If ListTitleSwitcher accepts className, pass it instead of this wrapper:
+            <ListTitleSwitcher className="block min-w-0 truncate" onOpenManage={() => setManageOpen(true)} />
+        */}
+              <div className="truncate">
+                <ListTitleSwitcher onOpenManage={() => setManageOpen(true)} />
+              </div>
+            </div>
 
             {activeListId && (
               <>
-                <ShareListInline
-                  listId={activeListId}
-                  currentUserId={user.id}
-                  isOpen={shareOpen}
-                  onOpenChange={setShareOpen}
-                  render="trigger"
-                />
+                {/* Controls never shrink */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <ShareListInline
+                    listId={activeListId}
+                    currentUserId={user.id}
+                    isOpen={shareOpen}
+                    onOpenChange={setShareOpen}
+                    render="trigger"
+                  />
 
-                {/* Delete (owner) / Unsubscribe (member) */}
-                <ListActions
-                  activeList={activeList}
-                  currentUserId={user.id}
-                  onAfterDelete={async (deletedId) => {
-                    if (String(deletedId) === String(activeListId)) {
-                      setActiveListId?.(null);
-                    }
-                    await refreshLists?.();
-                  }}
-                  onAfterUnsubscribe={async (leftId) => {
-                    if (String(leftId) === String(activeListId)) {
-                      setActiveListId?.(null);
-                    }
-                    await refreshLists?.();
-                  }}
-                />
+                  <ListActions
+                    activeList={activeList}
+                    currentUserId={user.id}
+                    onAfterDelete={async (deletedId) => {
+                      if (String(deletedId) === String(activeListId))
+                        setActiveListId?.(null);
+                      await refreshLists?.();
+                    }}
+                    onAfterUnsubscribe={async (leftId) => {
+                      if (String(leftId) === String(activeListId))
+                        setActiveListId?.(null);
+                      await refreshLists?.();
+                    }}
+                  />
+                </div>
               </>
             )}
           </div>
@@ -151,9 +158,8 @@ export default function Home() {
             />
           )}
 
-          {/* Type • Owner (type first per your preference) */}
           {lists.length > 0 && (activeType || ownerLabel) && (
-            <p className="text-sm text-gray-500 mt-1 truncate">
+            <p className="mt-1 truncate text-sm text-gray-500">
               {activeType ? <>Type: {activeType}</> : null}
               {activeType && ownerLabel ? " • " : null}
               {ownerLabel || null}
@@ -166,7 +172,7 @@ export default function Home() {
           <div className="shrink-0">
             <button
               onClick={() => setAddOpen((v) => !v)}
-              className={`px-4 py-2 rounded font-semibold border ${
+              className={`rounded px-4 py-2 font-semibold border ${
                 addOpen
                   ? "bg-gray-200 hover:bg-gray-300"
                   : "bg-green-500 hover:bg-green-600 text-white"

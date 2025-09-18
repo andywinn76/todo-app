@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { addDays, formatISO } from "date-fns";
@@ -11,6 +11,7 @@ const PRIORITIES = ["low", "medium", "high"];
 
 export default function TodoForm({ onCreated }) {
   const { lists, activeListId } = useLists();
+  const titleRef = useRef(null);
 
   const activeList = useMemo(
     () => lists.find((l) => String(l.id) === String(activeListId)),
@@ -40,6 +41,22 @@ export default function TodoForm({ onCreated }) {
     });
     setDueDate((prev) => (prev ? prev : newDue));
   }, [activeList?.id, activeList?.list_type]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!activeListId || busy) return;
+    // Delay to after paint; more reliable across browsers/SSR
+    const t = setTimeout(() => {
+      const el = titleRef.current;
+      if (el) {
+        el.focus();
+        // place caret at end if any text exists
+        try {
+          el.setSelectionRange(el.value.length, el.value.length);
+        } catch {}
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [activeListId, busy]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -76,6 +93,7 @@ export default function TodoForm({ onCreated }) {
       setDescription("");
       // Keep the priority/due date defaults tied to list_type for faster entry
       onCreated?.(data);
+      requestAnimationFrame(() => titleRef.current?.focus());
     } catch (err) {
       console.error(err);
       toast.error("Couldn’t create the todo.");
@@ -97,6 +115,7 @@ export default function TodoForm({ onCreated }) {
         {/* Title */}
         <input
           type="text"
+          ref={titleRef}
           placeholder={
             activeList?.list_type === "Groceries"
               ? "e.g., Milk, eggs, spinach…"
@@ -106,7 +125,6 @@ export default function TodoForm({ onCreated }) {
           onChange={(e) => setTitle(e.target.value)}
           className="min-w-0 flex-1 rounded border px-3 py-2"
           disabled={!activeListId || busy}
-          autoFocus
         />
 
         {/* Description (placed before the button in DOM so it stays above on mobile) */}
