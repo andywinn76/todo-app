@@ -37,6 +37,12 @@ export default function Home() {
     [lists, activeListId]
   );
 
+  // Robust owner check (matches ManageListsDrawer/ListActions semantics)
+  const isOwner =
+    !!activeList &&
+    (String(activeList.created_by) === String(user?.id) ||
+      String(activeList._role).toLowerCase() === "owner");
+
   const activeListType = activeList?.type || "todo";
   const activeType = activeList?.type ?? null;
 
@@ -53,7 +59,9 @@ export default function Home() {
     user?.user_metadata?.full_name?.split(" ")?.[1] ||
     "";
   const ownerLabel = ownerFirst
-    ? `List Owner: ${ownerFirst} ${ownerLast ? ownerLast[0].toUpperCase() + "." : ""}`
+    ? `List Owner: ${ownerFirst} ${
+        ownerLast ? ownerLast[0].toUpperCase() + "." : ""
+      }`
     : null;
 
   // (unchanged) refresh lists on mount/user change
@@ -79,13 +87,15 @@ export default function Home() {
 
             {activeListId && (
               <div className="flex items-center gap-2 shrink-0">
-                <ShareListInline
-                  listId={activeListId}
-                  currentUserId={user.id}
-                  isOpen={shareOpen}
-                  onOpenChange={setShareOpen}
-                  render="trigger"
-                />
+                {isOwner && (
+                  <ShareListInline
+                    listId={activeListId}
+                    currentUserId={user.id}
+                    isOpen={shareOpen}
+                    onOpenChange={setShareOpen}
+                    render="trigger"
+                  />
+                )}
 
                 <ListActions
                   activeList={activeList}
@@ -105,7 +115,7 @@ export default function Home() {
             )}
           </div>
 
-          {activeListId && (
+          {activeListId && isOwner && (
             <ShareListInline
               listId={activeListId}
               currentUserId={user.id}
@@ -145,7 +155,9 @@ export default function Home() {
 
       {/* Body */}
       {!hasValidActive ? (
-        <div className="text-gray-600">Select or create a list to get started.</div>
+        <div className="text-gray-600">
+          Select or create a list to get started.
+        </div>
       ) : activeListType === "todo" ? (
         <>
           {addOpen && activeListId && (
