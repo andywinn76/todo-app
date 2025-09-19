@@ -5,9 +5,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import TodoItem from "@/components/TodoItem";
 import { useLists } from "@/components/ListsProvider";
-import ListTypeBadge from "@/components/ListTypeBadge";
 
-export default function TodoList() {
+export default function TodoList({ refreshTick = 0 }) {
   const { lists, activeListId } = useLists();
   const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -18,7 +17,8 @@ export default function TodoList() {
       return;
     }
     fetchTodos(activeListId);
-  }, [activeListId]);
+    // ⬇️ refetch whenever refreshTick changes (e.g., after add)
+  }, [activeListId, refreshTick]);
 
   async function fetchTodos(listId) {
     try {
@@ -27,6 +27,7 @@ export default function TodoList() {
         .from("todos")
         .select("*")
         .eq("list_id", listId)
+        .order("due_date", { ascending: true })
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -47,15 +48,8 @@ export default function TodoList() {
     );
   }
 
-  const activeList = lists.find((l) => String(l.id) === String(activeListId));
-
   return (
     <div className="mt-6">
-      <div className="mb-4 flex items-center gap-2">
-        
-        
-      </div>
-
       {loading ? (
         <p className="text-gray-500">Loading lists...</p>
       ) : todos.length === 0 ? (

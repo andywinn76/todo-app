@@ -24,7 +24,6 @@ export default function TodoForm({ onCreated }) {
   const [dueDate, setDueDate] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // When the list (and thus list_type) changes, set sensible defaults
   useEffect(() => {
     if (!activeList) return;
 
@@ -35,7 +34,6 @@ export default function TodoForm({ onCreated }) {
 
     setPriority(defaults.priority);
 
-    // Only auto-set due date if empty or switching lists
     const newDue = formatISO(addDays(new Date(), defaults.dueInDays), {
       representation: "date",
     });
@@ -44,12 +42,10 @@ export default function TodoForm({ onCreated }) {
 
   useEffect(() => {
     if (!activeListId || busy) return;
-    // Delay to after paint; more reliable across browsers/SSR
     const t = setTimeout(() => {
       const el = titleRef.current;
       if (el) {
         el.focus();
-        // place caret at end if any text exists
         try {
           el.setSelectionRange(el.value.length, el.value.length);
         } catch {}
@@ -91,7 +87,6 @@ export default function TodoForm({ onCreated }) {
       toast.success("Todo added!");
       setTitle("");
       setDescription("");
-      // Keep the priority/due date defaults tied to list_type for faster entry
       onCreated?.(data);
       requestAnimationFrame(() => titleRef.current?.focus());
     } catch (err) {
@@ -107,10 +102,6 @@ export default function TodoForm({ onCreated }) {
       onSubmit={handleSubmit}
       className="rounded border bg-white p-3 shadow-sm"
     >
-      {/* 
-        Mobile: stacked in this order → Title, Description, Priority, Date, Add
-        Desktop (md+): single row for Title / Priority / Date / Add, with Description moved below full-width
-      */}
       <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
         {/* Title */}
         <input
@@ -127,7 +118,6 @@ export default function TodoForm({ onCreated }) {
           disabled={!activeListId || busy}
         />
 
-        {/* Description (placed before the button in DOM so it stays above on mobile) */}
         <textarea
           placeholder="Optional description…"
           value={description}

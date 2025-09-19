@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import useRequireAuth from "@/hooks/useRequireAuth";
 import { useLists } from "@/components/ListsProvider";
 import ShareListInline from "@/components/ShareListInline";
@@ -22,10 +21,11 @@ export default function Home() {
       activeListId: null,
     };
 
-  const [todos, setTodos] = useState([]);
-  const [addOpen, setAddOpen] = useState(false); // unified "Add" state across types
+  // ⬇️ remove local todos; let TodoList own its state
+  const [addOpen, setAddOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0); // ⬅️ ping for TodoList
 
   const hasValidActive =
     activeListId != null &&
@@ -40,10 +40,8 @@ export default function Home() {
   const activeListType = activeList?.type || "todo";
   const activeType = activeList?.type ?? null;
 
-  // 💡 Type registry drives header button text/visibility
   const cfg = TYPE_CONFIG[activeListType] || {};
 
-  // Owner label
   const ownerFirst =
     activeList?.owner_first_name ||
     user?.user_metadata?.first_name ||
@@ -55,47 +53,14 @@ export default function Home() {
     user?.user_metadata?.full_name?.split(" ")?.[1] ||
     "";
   const ownerLabel = ownerFirst
-    ? `List Owner: ${ownerFirst} ${
-        ownerLast ? ownerLast[0].toUpperCase() + "." : ""
-      }`
+    ? `List Owner: ${ownerFirst} ${ownerLast ? ownerLast[0].toUpperCase() + "." : ""}`
     : null;
 
-  // Load todos for todo lists only
-  const fetchTodos = async () => {
-    if (!user || !hasValidActive || activeListType !== "todo") {
-      setTodos([]);
-      return;
-    }
-    const { data, error } = await supabase
-      .from("todos")
-      .select("*")
-      .eq("list_id", String(activeListId))
-      .order("due_date", { ascending: true })
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error loading todos:", error);
-      setTodos([]);
-      return;
-    }
-    setTodos(data || []);
-  };
-
-  // Refresh lists on mount / user change
+  // (unchanged) refresh lists on mount/user change
   useEffect(() => {
     if (!user) return;
     refreshLists?.();
   }, [user, refreshLists]);
-
-  // Fetch todos when selection/type changes (todo only)
-  useEffect(() => {
-    if (!user) return;
-    if (!hasValidActive || activeListType !== "todo") {
-      setTodos([]);
-      return;
-    }
-    fetchTodos();
-  }, [user, activeListId, activeListType, lists]);
 
   if (!user || userLoading) return <p className="p-6">Loading...</p>;
 
@@ -106,44 +71,37 @@ export default function Home() {
         {/* LEFT */}
         <div className="min-w-0 flex-1">
           <div className="min-w-0 flex items-center gap-2">
-            {/* Title: allow grow, clamp with ellipsis */}
             <div className="min-w-0 flex-1">
-              {/* If ListTitleSwitcher accepts className, pass it instead of this wrapper:
-            <ListTitleSwitcher className="block min-w-0 truncate" onOpenManage={() => setManageOpen(true)} />
-        */}
               <div className="truncate">
                 <ListTitleSwitcher onOpenManage={() => setManageOpen(true)} />
               </div>
             </div>
 
             {activeListId && (
-              <>
-                {/* Controls never shrink */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <ShareListInline
-                    listId={activeListId}
-                    currentUserId={user.id}
-                    isOpen={shareOpen}
-                    onOpenChange={setShareOpen}
-                    render="trigger"
-                  />
+              <div className="flex items-center gap-2 shrink-0">
+                <ShareListInline
+                  listId={activeListId}
+                  currentUserId={user.id}
+                  isOpen={shareOpen}
+                  onOpenChange={setShareOpen}
+                  render="trigger"
+                />
 
-                  <ListActions
-                    activeList={activeList}
-                    currentUserId={user.id}
-                    onAfterDelete={async (deletedId) => {
-                      if (String(deletedId) === String(activeListId))
-                        setActiveListId?.(null);
-                      await refreshLists?.();
-                    }}
-                    onAfterUnsubscribe={async (leftId) => {
-                      if (String(leftId) === String(activeListId))
-                        setActiveListId?.(null);
-                      await refreshLists?.();
-                    }}
-                  />
-                </div>
-              </>
+                <ListActions
+                  activeList={activeList}
+                  currentUserId={user.id}
+                  onAfterDelete={async (deletedId) => {
+                    if (String(deletedId) === String(activeListId))
+                      setActiveListId?.(null);
+                    await refreshLists?.();
+                  }}
+                  onAfterUnsubscribe={async (leftId) => {
+                    if (String(leftId) === String(activeListId))
+                      setActiveListId?.(null);
+                    await refreshLists?.();
+                  }}
+                />
+              </div>
             )}
           </div>
 
@@ -167,7 +125,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* RIGHT: Unified header Add button (driven by TYPE_CONFIG) */}
+        {/* RIGHT */}
         {hasValidActive && cfg.supportsAdd && (
           <div className="shrink-0">
             <button
@@ -185,25 +143,28 @@ export default function Home() {
         )}
       </div>
 
-      {/* Body switches by list type */}
+      {/* Body */}
       {!hasValidActive ? (
-        <div className="text-gray-600">
-          Select or create a list to get started.
-        </div>
+        <div className="text-gray-600">Select or create a list to get started.</div>
       ) : activeListType === "todo" ? (
         <>
           {addOpen && activeListId && (
             <TodoForm
               user={user}
-              onTodoAdded={fetchTodos}
+              // ⬇️ match TodoForm's callback name
+              onCreated={() => {
+                // ping TodoList to refetch & close form
+                setRefreshTick((t) => t + 1);
+                setAddOpen(false);
+              }}
               isActive={addOpen}
               setIsActive={setAddOpen}
             />
           )}
-          <TodoList user={user} todos={todos} onRefresh={fetchTodos} />
+          {/* ⬇️ give TodoList a trigger to refetch when a todo is created */}
+          <TodoList refreshTick={refreshTick} />
         </>
       ) : activeListType === "grocery" ? (
-        // Wire GroceryList to the unified header button
         <GroceryList
           user={user}
           listId={activeListId}
@@ -211,11 +172,9 @@ export default function Home() {
           onOpenChange={setAddOpen}
         />
       ) : (
-        // Notes: supportsAdd=false for now (no header button)
         <NoteEditor user={user} listId={activeListId} />
       )}
 
-      {/* Drawer lives here so the TitleSwitcher can open it */}
       <ManageListsDrawer
         open={manageOpen}
         onClose={() => setManageOpen(false)}
