@@ -1,4 +1,4 @@
-
+// ListsProvider.jsx
 "use client";
 import {
   createContext,
@@ -11,6 +11,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/components/AuthProvider";
 
+const STORAGE_KEY = (userId) => `lastListId:${userId ?? "anon"}`;
 const ListsContext = createContext();
 
 export function ListsProvider({ children }) {
@@ -18,11 +19,12 @@ export function ListsProvider({ children }) {
   const [lists, setLists] = useState([]);
   const [activeListId, setActiveListId] = useState(null);
 
-  const storageKey = user ? `lastListId:${user.id}` : null;
+  const storageKey = user ? STORAGE_KEY(user.id) : null;
 
+  // Single source of truth for selecting a list + persisting the choice
   const selectList = useCallback(
     (id) => {
-      const nextId = id ? String(id) : null;
+      const nextId = id != null ? String(id) : null;
       setActiveListId(nextId);
       if (!storageKey) return;
       try {
@@ -33,12 +35,15 @@ export function ListsProvider({ children }) {
     [storageKey]
   );
 
+  // EARLY restore: on mount (per user), if nothing chosen yet, try saved id
   useLayoutEffect(() => {
     if (!user) return;
+    if (activeListId != null) return;
     try {
-      const saved = localStorage.getItem(`lastListId:${user.id}`);
-      if (saved) setActiveListId(saved);
+      const saved = localStorage.getItem(STORAGE_KEY(user.id));
+      if (saved) setActiveListId(saved); // okay to set directly here; selectList will run later on user actions
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const refreshLists = useCallback(
@@ -93,21 +98,32 @@ export function ListsProvider({ children }) {
 
       setLists(enriched);
 
-      // Auto-select the first list if none chosen yet
-      if (!activeListId && enriched.length) {
-        selectList(enriched[0].id);
+      // Selection policy:
+      // - If something is already selected, leave it.
+      // - Otherwise, prefer saved (if it still exists), else fall back to the first list.
+      if (activeListId == null && enriched.length) {
+        const saved = storageKey ? localStorage.getItem(storageKey) : null;
+        const exists =
+          saved && enriched.some((l) => String(l.id) === String(saved));
+        selectList(exists ? saved : enriched[0].id);
       }
 
       return enriched;
     },
-    [user, activeListId, selectList]
+    [user, activeListId, selectList, storageKey]
   );
 
+  // If selected id becomes invalid (e.g., list deleted or user unsubscribed), fall back gracefully
   useEffect(() => {
     if (!user) return;
     if (!lists.length) return;
-    if (activeListId && !lists.some((l) => String(l.id) === String(activeListId))) {
-      if (storageKey) localStorage.removeItem(storageKey);
+    if (
+      activeListId &&
+      !lists.some((l) => String(l.id) === String(activeListId))
+    ) {
+      try {
+        if (storageKey) localStorage.removeItem(storageKey);
+      } catch {}
       selectList(lists[0]?.id ?? null);
     }
   }, [user, lists, activeListId, storageKey, selectList]);

@@ -55,10 +55,7 @@ export default function Header({ children }) {
             await refreshLists?.();
 
             // 2) Set the newly joined list active
-            setActiveListId(listId);
-
-            // 3) (Optional) If your todos don’t auto-fetch on activeList change:
-            // await fetchTodosForList(listId);
+            setActiveListId(listId);            
 
             toast.success(`Joined “${listName || "list"}”`);
           }}

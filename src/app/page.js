@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useRequireAuth from "@/hooks/useRequireAuth";
 import { useLists } from "@/components/ListsProvider";
 import ShareListInline from "@/components/ShareListInline";
@@ -12,42 +12,64 @@ import ListActions from "@/components/ListActions";
 import ManageListsDrawer from "@/components/ManageListsDrawer";
 import ListTitleSwitcher from "@/components/ListTitleSwitcher";
 import { TYPE_CONFIG } from "@/lib/typeConfig";
+import { List } from "lucide-react";
+import ListTypeBadge from "@/components/ListTypeBadge";
 
 export default function Home() {
   const { user, userLoading } = useRequireAuth();
-  const { lists, activeListId, setActiveListId, refreshLists } =
-    useLists?.() ?? {
-      lists: [],
-      activeListId: null,
-    };
+  const { lists, activeListId, setActiveListId, refreshLists } = useLists();
 
-  // ⬇️ remove local todos; let TodoList own its state
+  // ⬇️ local UI state only
   const [addOpen, setAddOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
-  const [refreshTick, setRefreshTick] = useState(0); // ⬅️ ping for TodoList
+
+  // ⬇️ NEW: last created row for optimistic append (sent to <TodoList />)
+  const [lastCreated, setLastCreated] = useState(null);
+
+  // --- Effects hardening ---
+  const didRunForUserId = useRef(null);
+  const lastRefreshAt = useRef(0);
+  const COOLDOWN_MS = 400;
+
+  useEffect(() => {
+    if (userLoading) return;            // wait until auth is settled
+    const uid = user?.id ?? null;
+
+    if (!uid) {
+      // Logout or unauthenticated
+      didRunForUserId.current = null;
+      return;
+    }
+
+    if (didRunForUserId.current === uid) return; // StrictMode double-mount guard
+
+    const now = Date.now();
+    if (now - lastRefreshAt.current < COOLDOWN_MS) return; // tiny cooldown
+
+    didRunForUserId.current = uid;
+    lastRefreshAt.current = now;
+    void refreshLists?.();
+  }, [user?.id, userLoading, refreshLists]);
 
   const hasValidActive =
-    activeListId != null &&
-    activeListId !== "" &&
-    lists.some((l) => String(l.id) === String(activeListId));
+    activeListId != null && lists.some((l) => l.id === activeListId);
 
   const activeList = useMemo(
-    () => lists.find((l) => String(l.id) === String(activeListId)),
-    [lists, activeListId]
+    () => (hasValidActive ? lists.find((l) => l.id === activeListId) : null),
+    [hasValidActive, lists, activeListId]
   );
 
-  // Robust owner check (matches ManageListsDrawer/ListActions semantics)
+  // Robust owner check
   const isOwner =
     !!activeList &&
     (String(activeList.created_by) === String(user?.id) ||
       String(activeList._role).toLowerCase() === "owner");
 
   const activeListType = activeList?.type || "todo";
-  const activeType = activeList?.type ?? null;
+  const cfg = useMemo(() => TYPE_CONFIG[activeListType] || {}, [activeListType]);
 
-  const cfg = TYPE_CONFIG[activeListType] || {};
-
+  // Owner label
   const ownerFirst =
     activeList?.owner_first_name ||
     user?.user_metadata?.first_name ||
@@ -59,16 +81,13 @@ export default function Home() {
     user?.user_metadata?.full_name?.split(" ")?.[1] ||
     "";
   const ownerLabel = ownerFirst
-    ? `List Owner: ${ownerFirst} ${
-        ownerLast ? ownerLast[0].toUpperCase() + "." : ""
-      }`
+    ? `List Owner: ${ownerFirst} ${ownerLast ? ownerLast[0].toUpperCase() + "." : ""}`
     : null;
 
-  // (unchanged) refresh lists on mount/user change
+  // Auto-close Add when switching to a type that doesn’t support it
   useEffect(() => {
-    if (!user) return;
-    refreshLists?.();
-  }, [user, refreshLists]);
+    if (addOpen && !cfg.supportsAdd) setAddOpen(false);
+  }, [cfg.supportsAdd, addOpen]);
 
   if (!user || userLoading) return <p className="p-6">Loading...</p>;
 
@@ -101,13 +120,13 @@ export default function Home() {
                   activeList={activeList}
                   currentUserId={user.id}
                   onAfterDelete={async (deletedId) => {
-                    if (String(deletedId) === String(activeListId))
-                      setActiveListId?.(null);
+                    if (deletedId === activeListId) setActiveListId?.(null);
+                    lastRefreshAt.current = Date.now();
                     await refreshLists?.();
                   }}
                   onAfterUnsubscribe={async (leftId) => {
-                    if (String(leftId) === String(activeListId))
-                      setActiveListId?.(null);
+                    if (leftId === activeListId) setActiveListId?.(null);
+                    lastRefreshAt.current = Date.now();
                     await refreshLists?.();
                   }}
                 />
@@ -126,10 +145,11 @@ export default function Home() {
             />
           )}
 
-          {lists.length > 0 && (activeType || ownerLabel) && (
+          {lists.length > 0 && (activeListType || ownerLabel) && (
             <p className="mt-1 truncate text-sm text-gray-500">
-              {activeType ? <>Type: {activeType}</> : null}
-              {activeType && ownerLabel ? " • " : null}
+              {/* {activeListType ? <>Type: {activeListType}</> : null} */}
+              <ListTypeBadge type={activeListType} className="mr-2" />
+              {activeListType && ownerLabel ? " • " : null}
               {ownerLabel || null}
             </p>
           )}
@@ -155,26 +175,23 @@ export default function Home() {
 
       {/* Body */}
       {!hasValidActive ? (
-        <div className="text-gray-600">
-          Select or create a list to get started.
-        </div>
+        <div className="text-gray-600">Select or create a list to get started.</div>
       ) : activeListType === "todo" ? (
         <>
           {addOpen && activeListId && (
             <TodoForm
               user={user}
-              // ⬇️ match TodoForm's callback name
-              onCreated={() => {
-                // ping TodoList to refetch & close form
-                setRefreshTick((t) => t + 1);
+              onCreated={(row) => {
+                // Optimistic append path: hand the new row to <TodoList /> and close the form
+                setLastCreated(row);
                 setAddOpen(false);
               }}
               isActive={addOpen}
               setIsActive={setAddOpen}
             />
           )}
-          {/* ⬇️ give TodoList a trigger to refetch when a todo is created */}
-          <TodoList refreshTick={refreshTick} />
+          {/* ⬇️ Send the last created row to TodoList (no refreshTick) */}
+          <TodoList lastCreated={lastCreated} />
         </>
       ) : activeListType === "grocery" ? (
         <GroceryList
@@ -192,15 +209,16 @@ export default function Home() {
         onClose={() => setManageOpen(false)}
         user={user}
         lists={lists}
-        setLists={() => {}}
         triggerRef={{ current: null }}
         onAfterCreate={async (created) => {
+          lastRefreshAt.current = Date.now();
           const updated = await refreshLists?.();
           if (created?.id) setActiveListId?.(created.id);
         }}
         onAfterDelete={async (deletedId) => {
+          lastRefreshAt.current = Date.now();
           const updated = await refreshLists?.();
-          if (String(deletedId) === String(activeListId)) {
+          if (deletedId === activeListId) {
             if (updated?.length) setActiveListId?.(updated[0].id);
             else setActiveListId?.(null);
           }

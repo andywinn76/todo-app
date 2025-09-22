@@ -7,6 +7,7 @@ import ShareListInline from "@/components/ShareListInline";
 import { FaPencilAlt } from "react-icons/fa";
 import ListActions from "@/components/ListActions";
 import { useLists } from "@/components/ListsProvider";
+import ListTypeBadge from "@/components/ListTypeBadge";
 
 function TypePicker({ value, onChange, disabled, id = "drawer-list-type" }) {
   return (
@@ -34,12 +35,11 @@ export default function ManageListsDrawer({
   onClose,
   user,
   lists,
-  setLists,
   onAfterDelete, // async (deletedListId) => void
   onAfterCreate, // async (createdList) => void
   triggerRef, // ref to the "Manage" button (for focus return)
 }) {
-  const { activeListId, setActiveListId } = useLists(); // <- use provider to select
+  const { activeListId, setActiveListId } = useLists(); // UUID strings
   const [busy, setBusy] = useState(false);
 
   // Create form state
@@ -277,10 +277,15 @@ export default function ManageListsDrawer({
           {lists.map((list) => {
             const inviting = shareOpenId === list.id;
             const canInvite = isOwner(list);
-            const isCurrent = String(list.id) === String(activeListId);
+            const isCurrent = list.id === activeListId;
 
             return (
-              <div key={list.id} className={`rounded border p-3 ${isCurrent ? "border-blue-200 bg-blue-50/30" : ""}`}>
+              <div
+                key={list.id}
+                className={`rounded border p-3 ${
+                  isCurrent ? "border-blue-200 bg-blue-50/30" : ""
+                }`}
+              >
                 {/* Row header */}
                 <div className="flex items-center justify-between gap-2">
                   {/* SELECT BUTTON (left column) */}
@@ -289,22 +294,22 @@ export default function ManageListsDrawer({
                     className="min-w-0 flex-1 text-left rounded px-2 py-1 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     title="Select this list"
                     onClick={() => {
-                      setActiveListId(list.id);
+                      setActiveListId(list.id); // UUID string
                       handleClose();
                     }}
                   >
                     <div className={`font-medium ${inviting ? "" : "truncate"}`}>
                       {list.name || "Untitled"}
-                      {isCurrent && <span className="ml-2 text-xs text-blue-600">(current)</span>}
+                      {isCurrent && (
+                        <span className="ml-2 text-xs text-blue-600">(current)</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <span className="inline-flex items-center gap-1">
                         Owner: {ownerLabelFor(list, user)}
                       </span>
-                      {list?.type && (
-                        <span className="inline-block rounded-full border px-2 py-0.5 bg-gray-50">
-                          {list.type}
-                        </span>
+                      {list?.type && (                        
+                        <ListTypeBadge type={list?.type} className="mr-2" />
                       )}
                     </div>
                   </button>

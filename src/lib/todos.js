@@ -1,15 +1,27 @@
 import { supabase } from "./supabaseClient";
 
-//Fetch all todos for a given list
+// //Fetch all todos for a given list (OLD FETCH)
+// export async function fetchTodos(listId) {
+//   const { data, error } = await supabase
+//     .from("todos")
+//     .select("*")
+//     .eq("list_id", listId)
+//     .order("due_date", { ascending: true })
+//     .order("created_at", { ascending: false });
+
+//   return { data, error };
+// }
 export async function fetchTodos(listId) {
+  if (!listId) return { data: [], error: null };
+
   const { data, error } = await supabase
     .from("todos")
     .select("*")
-    .eq("list_id", listId)
+    .eq("list_id", String(listId))
     .order("due_date", { ascending: true })
     .order("created_at", { ascending: false });
 
-  return { data, error };
+  return { data: data ?? [], error };
 }
 
 //Create a new item
