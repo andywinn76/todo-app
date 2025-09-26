@@ -189,8 +189,9 @@ export default function ManageListsDrawer({
         aria-modal="true"
         aria-labelledby="manage-lists-title"
         className={`fixed inset-y-0 left-0 z-50 w-full max-w-[420px] bg-white shadow-2xl p-4 outline-none
-            transform transition-transform duration-300 ease-out
-            ${open ? "translate-x-0" : "-translate-x-full"}`}
+          flex flex-col h-dvh transform transition-transform duration-300 ease-out ${
+            open ? "translate-x-0" : "-translate-x-full"
+          }`}
         tabIndex={-1}
       >
         <div className="flex items-center justify-between mb-3">
@@ -242,13 +243,19 @@ export default function ManageListsDrawer({
               disabled={creating}
             />
 
-            <TypePicker value={newType} onChange={setNewType} disabled={creating} />
+            <TypePicker
+              value={newType}
+              onChange={setNewType}
+              disabled={creating}
+            />
 
             <div className="flex gap-2">
               <button
                 type="submit"
                 disabled={creating || !newName.trim()}
-                className={`${creating ? "opacity-75 cursor-not-allowed" : ""} bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded`}
+                className={`${
+                  creating ? "opacity-75 cursor-not-allowed" : ""
+                } bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded`}
               >
                 {creating ? "Creating…" : "Create List"}
               </button>
@@ -269,9 +276,11 @@ export default function ManageListsDrawer({
         )}
 
         {/* Existing lists */}
-        <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
+        <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
           {lists.length === 0 && (
-            <p className="text-sm text-gray-600">No lists found.</p>
+            <p className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
+              No lists found.
+            </p>
           )}
 
           {lists.map((list) => {
@@ -287,7 +296,7 @@ export default function ManageListsDrawer({
                 }`}
               >
                 {/* Row header */}
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between mb-3 sticky top-0 bg-white z-10 pt-1">
                   {/* SELECT BUTTON (left column) */}
                   <button
                     type="button"
@@ -298,17 +307,21 @@ export default function ManageListsDrawer({
                       handleClose();
                     }}
                   >
-                    <div className={`font-medium ${inviting ? "" : "truncate"}`}>
+                    <div
+                      className={`font-medium ${inviting ? "" : "truncate"}`}
+                    >
                       {list.name || "Untitled"}
                       {isCurrent && (
-                        <span className="ml-2 text-xs text-blue-600">(current)</span>
+                        <span className="ml-2 text-xs text-blue-600">
+                          (current)
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <span className="inline-flex items-center gap-1">
                         Owner: {ownerLabelFor(list, user)}
                       </span>
-                      {list?.type && (                        
+                      {list?.type && (
                         <ListTypeBadge type={list?.type} className="mr-2" />
                       )}
                     </div>

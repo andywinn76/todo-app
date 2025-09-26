@@ -1,28 +1,100 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
 
-// Simple detector: treat input as email if it includes "@"
 function looksLikeEmail(v) {
   return /\S+@\S+\.\S+/.test(v);
 }
 
 export default function LoginPage() {
   const router = useRouter();
+  const search = useSearchParams();
+  const token = search?.get("token")?.trim() || "";
+
   const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName]   = useState("");
-  const [username, setUsername]   = useState("");
+  const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
   const [emailOrUsername, setEmailOrUsername] = useState("");
-  const [password, setPassword]   = useState("");
-  const [isSignUp, setIsSignUp]   = useState(false);
-  const [error, setError]         = useState("");
-  const [busy, setBusy]           = useState(false);
+  const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteStatus, setInviteStatus] = useState(null);
+  const [inviteChecked, setInviteChecked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!token) {
+        setInviteChecked(true);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from("app_invites")
+          .select("email, status, expires_at")
+          .eq("token", token)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data) {
+          if (!cancelled) {
+            setInviteStatus("invalid");
+            toast.error("Invite link is invalid.");
+          }
+          return;
+        }
+
+        const expired = data.expires_at && new Date(data.expires_at).getTime() < Date.now();
+        if (expired) {
+          if (!cancelled) {
+            setInviteStatus("expired");
+            toast.error("This invite link has expired.");
+          }
+          return;
+        }
+
+        if (data.status && data.status !== "pending") {
+          if (!cancelled) {
+            setInviteStatus(data.status);
+            toast.error(
+              data.status === "accepted"
+                ? "This invite was already accepted."
+                : "This invite is no longer valid."
+            );
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setInviteEmail(data.email);
+          setInviteStatus("pending");
+          setIsSignUp(true);
+          setEmailOrUsername(data.email);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setInviteStatus("error");
+          toast.error("Could not verify invite. Try again later.");
+        }
+      } finally {
+        if (!cancelled) setInviteChecked(true);
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   async function usernameAvailable(name) {
     if (!name) return false;
@@ -50,14 +122,12 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
-        // Basic client-side validation
         if (!USERNAME_REGEX.test(uname)) {
           setError("Username must be 3–20 chars: letters, numbers, or underscore.");
           setBusy(false);
           return;
         }
 
-        // Pre-check availability
         const ok = await usernameAvailable(uname);
         if (!ok) {
           setError("That username is already taken. Try another.");
@@ -65,7 +135,6 @@ export default function LoginPage() {
           return;
         }
 
-        // For sign-up, we still collect email in the same box
         const emailTrim = emailOrUsername.trim().toLowerCase();
         if (!looksLikeEmail(emailTrim)) {
           setError("Please enter a valid email address.");
@@ -73,7 +142,12 @@ export default function LoginPage() {
           return;
         }
 
-        // Create auth user and stash names + username in user_metadata
+        if (inviteEmail && inviteEmail.toLowerCase() !== emailTrim) {
+          setError("This invite is for a different email address.");
+          setBusy(false);
+          return;
+        }
+
         const { data: sign, error: signErr } = await supabase.auth.signUp({
           email: emailTrim,
           password: passTrim,
@@ -93,7 +167,6 @@ export default function LoginPage() {
           return;
         }
 
-        // If email confirmations are OFF, we have a session and can upsert profile
         const hasSession = !!sign.session;
         if (hasSession && sign.user) {
           const { error: upErr } = await supabase.from("profiles").upsert(
@@ -101,8 +174,8 @@ export default function LoginPage() {
               id: sign.user.id,
               first_name: first || null,
               last_name: last || null,
-              username: uname, // unique in DB
-              email: emailTrim, // store email for username login lookup
+              username: uname,
+              email: emailTrim,
               avatar_url: null,
               updated_at: new Date().toISOString(),
             },
@@ -121,15 +194,28 @@ export default function LoginPage() {
           }
         }
 
+        // ✅ Mark invite accepted if token + email match
+        if (token && inviteEmail && inviteStatus === "pending") {
+          const { error: updErr } = await supabase
+            .from("app_invites")
+            .update({ status: "accepted", accepted_at: new Date().toISOString() })
+            .eq("token", token)
+            .eq("email", emailTrim);
+
+          if (updErr) {
+            console.warn("Could not update invite status:", updErr.message);
+            toast.error("Account created, but could not mark invite as accepted.");
+          } else {
+            toast.success("Invite accepted!");
+          }
+        }
+
         toast.success("Account created! Check your email to verify (if required).");
         router.push("/");
       } else {
-        // LOGIN: allow email OR username
         const raw = emailOrUsername.trim();
-
         let emailToUse = raw;
         if (!looksLikeEmail(raw)) {
-          // treat as username: resolve to email via RPC
           const { data: resolved, error: rpcErr } = await supabase.rpc(
             "lookup_email_for_username",
             { uname: raw.toLowerCase() }
@@ -166,14 +252,11 @@ export default function LoginPage() {
     }
   };
 
+  const emailLocked = Boolean(inviteEmail) && inviteStatus === "pending";
+
   return (
     <main className="max-w-md mx-auto mt-20 p-6 border rounded-xl shadow">
-      <Logo
-        type="static"
-        size={200}
-        className="mx-auto mb-6 rounded-2xl"
-        priority
-      />
+      <Logo type="static" size={200} className="mx-auto mb-6 rounded-2xl" priority />
       <h1 className="text-3xl font-bold mb-4">Welcome to Let's Doooo It!</h1>
       <p className="mx-14 text-blue-600 text-center mb-6">
         To get started, either login or sign-up using the form below.
@@ -182,6 +265,18 @@ export default function LoginPage() {
       <h1 className="text-2xl font-bold mb-4">
         {isSignUp ? "Create an Account" : "Login"}
       </h1>
+
+      {token && (
+        <div className="mb-3 text-sm rounded-md p-2 border">
+          <strong>Invite link</strong>
+          {inviteChecked && inviteStatus === "pending" && inviteEmail && (
+            <span className="ml-2">for <span className="font-medium">{inviteEmail}</span></span>
+          )}
+          {inviteChecked && inviteStatus && inviteStatus !== "pending" && (
+            <span className="ml-2 text-red-600">(not valid)</span>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {isSignUp && (
@@ -225,12 +320,18 @@ export default function LoginPage() {
         <input
           type="text"
           placeholder={isSignUp ? "Email" : "Email or Username"}
-          className="w-full border px-3 py-2 rounded"
+          className={`w-full border px-3 py-2 rounded ${emailLocked ? "bg-gray-100" : ""}`}
           value={emailOrUsername}
           onChange={(e) => setEmailOrUsername(e.target.value)}
           autoComplete={isSignUp ? "email" : "username"}
           required
+          disabled={emailLocked}
         />
+        {emailLocked && (
+          <p className="text-xs text-gray-600 -mt-2">
+            Email locked from invite link. Use this address to sign up.
+          </p>
+        )}
 
         <input
           type="password"
@@ -248,13 +349,7 @@ export default function LoginPage() {
           disabled={busy}
           className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         >
-          {busy
-            ? isSignUp
-              ? "Creating…"
-              : "Logging in…"
-            : isSignUp
-            ? "Sign Up"
-            : "Log In"}
+          {busy ? (isSignUp ? "Creating…" : "Logging in…") : isSignUp ? "Sign Up" : "Log In"}
         </button>
       </form>
 

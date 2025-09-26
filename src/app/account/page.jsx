@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { upsertProfileFromAuthUser } from "@/utils/profileSync";
 import { toast } from "sonner";
+import Link from "next/link";
 
 export default function AccountPage() {
   const [loading, setLoading] = useState(true);
@@ -62,14 +63,15 @@ export default function AccountPage() {
         setLastName(profile.last_name ?? "");
         setUsername(profile.username ?? "");
         setAvatarUrl(profile.avatar_url ?? "");
-      } else {// As a fallback only (shouldn’t happen after upsertProfileFromAuthUser)
+      } else {
+        // As a fallback only (shouldn’t happen after upsertProfileFromAuthUser)
         const { error: insertErr } = await supabase.from("profiles").insert({
           id: user.id,
           first_name: user.user_metadata?.first_name ?? "",
-          last_name:  user.user_metadata?.last_name  ?? "",
-          username:   null,
+          last_name: user.user_metadata?.last_name ?? "",
+          username: null,
           avatar_url: null,
-          email:      user.email ?? null,
+          email: user.email ?? null,
           updated_at: new Date().toISOString(),
         });
         if (insertErr) toast.error("Could not create profile row");
@@ -216,7 +218,8 @@ export default function AccountPage() {
             maxLength={20}
           />
           <p className="text-xs text-gray-500 mt-1">
-            Unique username, 3 to 30 characters: letters, numbers, and underscores are allowed.
+            Unique username, 3 to 30 characters: letters, numbers, and
+            underscores are allowed.
           </p>
         </div>
 
@@ -256,6 +259,24 @@ export default function AccountPage() {
           </button>
         </div>
       </form>
+
+      <div className="mt-6 border-t pt-4">
+        <h2 className="text-lg font-semibold mb-4">Invites</h2>
+        <div className="flex gap-3">
+          <Link
+            href="/invite"
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+          >
+            Send Invites
+          </Link>
+          <Link
+            href="/invite/manage"
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+          >
+            Manage Invites
+          </Link>
+        </div>
+      </div>
     </main>
   );
 }

@@ -12,7 +12,6 @@ import ListActions from "@/components/ListActions";
 import ManageListsDrawer from "@/components/ManageListsDrawer";
 import ListTitleSwitcher from "@/components/ListTitleSwitcher";
 import { TYPE_CONFIG } from "@/lib/typeConfig";
-import { List } from "lucide-react";
 import ListTypeBadge from "@/components/ListTypeBadge";
 
 export default function Home() {
@@ -33,7 +32,7 @@ export default function Home() {
   const COOLDOWN_MS = 400;
 
   useEffect(() => {
-    if (userLoading) return;            // wait until auth is settled
+    if (userLoading) return; // wait until auth is settled
     const uid = user?.id ?? null;
 
     if (!uid) {
@@ -67,7 +66,10 @@ export default function Home() {
       String(activeList._role).toLowerCase() === "owner");
 
   const activeListType = activeList?.type || "todo";
-  const cfg = useMemo(() => TYPE_CONFIG[activeListType] || {}, [activeListType]);
+  const cfg = useMemo(
+    () => TYPE_CONFIG[activeListType] || {},
+    [activeListType]
+  );
 
   // Owner label
   const ownerFirst =
@@ -81,7 +83,9 @@ export default function Home() {
     user?.user_metadata?.full_name?.split(" ")?.[1] ||
     "";
   const ownerLabel = ownerFirst
-    ? `List Owner: ${ownerFirst} ${ownerLast ? ownerLast[0].toUpperCase() + "." : ""}`
+    ? `List Owner: ${ownerFirst} ${
+        ownerLast ? ownerLast[0].toUpperCase() + "." : ""
+      }`
     : null;
 
   // Auto-close Add when switching to a type that doesn’t support it
@@ -166,8 +170,18 @@ export default function Home() {
                   : "bg-green-500 hover:bg-green-600 text-white"
               }`}
               aria-expanded={addOpen}
+              aria-label={addOpen ? "Cancel" : cfg.addLabel || "Add"}
+              title={addOpen ? "Cancel" : cfg.addLabel || "Add"}
+              type="button"
             >
-              {addOpen ? "Cancel" : cfg.addLabel || "Add"}
+              {/* Mobile symbol */}
+              <span className="sm:hidden text-xl leading-none">
+                {addOpen ? "×" : "+"}
+              </span>
+              {/* Desktop label */}
+              <span className="hidden sm:inline">
+                {addOpen ? "Cancel" : cfg.addLabel || "Add"}
+              </span>
             </button>
           </div>
         )}
@@ -175,7 +189,9 @@ export default function Home() {
 
       {/* Body */}
       {!hasValidActive ? (
-        <div className="text-gray-600">Select or create a list to get started.</div>
+        <div className="text-gray-600">
+          Select or create a list to get started.
+        </div>
       ) : activeListType === "todo" ? (
         <>
           {addOpen && activeListId && (
