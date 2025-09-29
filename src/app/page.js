@@ -231,6 +231,10 @@ export default function Home() {
           const updated = await refreshLists?.();
           if (created?.id) setActiveListId?.(created.id);
         }}
+        onAfterRename={async () => {
+          lastRefreshAt.current = Date.now();
+          await refreshLists?.();
+        }}
         onAfterDelete={async (deletedId) => {
           lastRefreshAt.current = Date.now();
           const updated = await refreshLists?.();

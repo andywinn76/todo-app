@@ -37,6 +37,7 @@ export default function ManageListsDrawer({
   lists,
   onAfterDelete, // async (deletedListId) => void
   onAfterCreate, // async (createdList) => void
+  onAfterRename,
   triggerRef, // ref to the "Manage" button (for focus return)
 }) {
   const { activeListId, setActiveListId } = useLists(); // UUID strings
@@ -55,6 +56,13 @@ export default function ManageListsDrawer({
 
   // Sharing state (which list id is currently inviting)
   const [shareOpenId, setShareOpenId] = useState(null);
+  // Optimistic update for sharing state
+  const [optimisticNames, setOptimisticNames] = useState({});
+
+  //Renaming lists state
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
 
   // Helpers
   function isOwner(list) {
@@ -62,6 +70,7 @@ export default function ManageListsDrawer({
     if (list?._role) return list._role === "owner";
     return false;
   }
+
   function ownerLabelFor(list, user) {
     if (!list) return "—";
     if (list.created_by === user.id) return "Me";
@@ -135,6 +144,8 @@ export default function ManageListsDrawer({
     setNewName("");
     setNewType("todo");
     setShareOpenId(null);
+    // fresh session of the drawer: clear any stale optimistic names
+    setOptimisticNames({});
   }, [open]);
 
   function handleClose() {
@@ -173,6 +184,62 @@ export default function ManageListsDrawer({
     handleClose();
   }
 
+  function startRename(list) {
+    if (!isOwner(list)) {
+      toast.error("Only the owner can rename this list.");
+      return;
+    }
+    // if switching to a new list while renaming, reset state first
+    setRenamingId(list.id);
+    setRenameValue(list.name || "");
+    setRenaming(false);
+    setShareOpenId(null);
+  }
+
+  function cancelRename() {
+    setRenamingId(null);
+    setRenameValue("");
+    setRenaming(false);
+  }
+
+  //Renaming function
+  async function saveRename(list) {
+    if (!user) return;
+    const name = (renameValue || "").trim();
+    if (!name) {
+      toast.error("Please enter a list name");
+      return;
+    }
+    if (name === (list.name || "")) {
+      cancelRename();
+      return;
+    }
+    setRenaming(true);
+    // Optimistically update UI
+    setOptimisticNames((m) => ({ ...m, [list.id]: name }));
+    const { data: updated, error } = await supabase
+      .from("lists")
+      .update({ name })
+      .eq("id", list.id)
+      .select()
+      .single();
+    setRenaming(false);
+    if (error) {
+      console.error("rename list error:", error);
+      toast.error("Could not rename list");
+      // Roll back optimistic change
+      setOptimisticNames((m) => {
+        const copy = { ...m };
+        delete copy[list.id];
+        return copy;
+      });
+      return;
+    }
+    toast.success("List renamed");
+    cancelRename();
+    await onAfterRename?.(updated);
+  }
+
   if (!open) return null;
 
   return (
@@ -194,7 +261,7 @@ export default function ManageListsDrawer({
           }`}
         tabIndex={-1}
       >
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-baseline justify-between mb-3">
           <h2
             id="manage-lists-title"
             className="text-lg font-semibold"
@@ -203,27 +270,32 @@ export default function ManageListsDrawer({
           >
             Manage Lists
           </h2>
-          {!createdThisSession && !showCreateForm && (
+
+          <div className="flex items-baseline gap-2">
+            {!createdThisSession && !showCreateForm && (
+              <button
+                type="button"
+                onClick={() => setShowCreateForm(true)}
+                disabled={busy || creating}
+                className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                aria-controls="create-list-form"
+              >
+                Add New
+              </button>
+            )}
+
             <button
-              type="button"
-              onClick={() => setShowCreateForm(true)}
+              onClick={handleClose}
               disabled={busy || creating}
-              className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
-              aria-controls="create-list-form"
+              className="text-sm px-3 py-1 rounded border hover:bg-gray-50"
+              aria-label="Close manage lists"
             >
-              Add New
+              Close
             </button>
-          )}
-          <button
-            onClick={handleClose}
-            disabled={busy || creating}
-            className="text-sm px-3 py-1 rounded border hover:bg-gray-50"
-            aria-label="Close manage lists"
-          >
-            Close
-          </button>
+          </div>
         </div>
 
+        {/* Form to create a new list */}
         {showCreateForm && (
           <form
             id="create-list-form"
@@ -276,7 +348,7 @@ export default function ManageListsDrawer({
         )}
 
         {/* Existing lists */}
-        <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
+        <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 pb-2">
           {lists.length === 0 && (
             <p className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
               No lists found.
@@ -291,7 +363,7 @@ export default function ManageListsDrawer({
             return (
               <div
                 key={list.id}
-                className={`rounded border p-3 ${
+                className={`rounded border border-gray-400 pl-1 pr-3 py-1 ${
                   isCurrent ? "border-blue-200 bg-blue-50/30" : ""
                 }`}
               >
@@ -307,16 +379,18 @@ export default function ManageListsDrawer({
                       handleClose();
                     }}
                   >
+                    {/* List name */}
                     <div
                       className={`font-medium ${inviting ? "" : "truncate"}`}
                     >
-                      {list.name || "Untitled"}
+                      {(optimisticNames[list.id] ?? list.name) || "Untitled"}
                       {isCurrent && (
                         <span className="ml-2 text-xs text-blue-600">
                           (current)
                         </span>
                       )}
                     </div>
+                    {/* List owner and type of list badge */}
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <span className="inline-flex items-center gap-1">
                         Owner: {ownerLabelFor(list, user)}
@@ -329,16 +403,64 @@ export default function ManageListsDrawer({
 
                   {/* Actions: Share + Delete/Unsubscribe via ListActions */}
                   <div className="flex items-center gap-2 shrink-0">
-                    {/* (Disabled) rename placeholder */}
-                    <button
-                      type="button"
-                      disabled={busy || creating}
-                      className="text-sm px-2 py-1 hover:bg-gray-100 opacity-60"
-                      title="Rename (coming soon)"
-                      aria-disabled="true"
-                    >
-                      <FaPencilAlt className="w-5 h-5" />
-                    </button>
+                    {/* Rename (owners only) */}
+                    {isOwner(list) &&
+                      (renamingId === list.id ? (
+                        // ✅ Show the rename form
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (!renaming) saveRename(list);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") cancelRename();
+                          }}
+                          className="min-w-0 flex-1 flex items-center gap-2 px-2 py-1"
+                        >
+                          <input
+                            autoFocus
+                            type="text"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            className="w-full border rounded px-2 py-1"
+                            placeholder="List name"
+                            disabled={renaming || busy || creating}
+                            aria-label="Rename list"
+                          />
+                          <button
+                            type="submit"
+                            disabled={
+                              renaming ||
+                              !renameValue.trim() ||
+                              renameValue.trim() === (list.name || "")
+                            }
+                            className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                            aria-label="Save new name"
+                          >
+                            {renaming ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelRename}
+                            disabled={renaming}
+                            className="text-sm px-3 py-1 rounded border hover:bg-gray-50"
+                            aria-label="Cancel rename"
+                          >
+                            Cancel
+                          </button>
+                        </form>
+                      ) : (
+                        // ✏️ Show the pencil when not renaming
+                        <button
+                          type="button"
+                          disabled={busy || creating || renaming}
+                          onClick={() => startRename(list)}
+                          className="text-sm px-2 py-1 hover:bg-gray-100"
+                          title="Rename list"
+                        >
+                          <FaPencilAlt className="w-5 h-5" />
+                        </button>
+                      ))}
 
                     {/* Share trigger (owners only here) */}
                     {canInvite && (
