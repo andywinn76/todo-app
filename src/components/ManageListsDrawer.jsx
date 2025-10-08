@@ -8,6 +8,7 @@ import { FaPencilAlt } from "react-icons/fa";
 import ListActions from "@/components/ListActions";
 import { useLists } from "@/components/ListsProvider";
 import ListTypeBadge from "@/components/ListTypeBadge";
+import { LIST_TYPES, LIST_TYPE_LABELS } from "@/utils/listTypes";
 
 function TypePicker({ value, onChange, disabled, id = "drawer-list-type" }) {
   return (
@@ -25,6 +26,11 @@ function TypePicker({ value, onChange, disabled, id = "drawer-list-type" }) {
         <option value="todo">Todo</option>
         <option value="grocery">Grocery</option>
         <option value="note">Note</option>
+        {/* {LIST_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {LIST_TYPE_LABELS[type] ?? type}
+          </option>
+        ))} */}
       </select>
     </>
   );

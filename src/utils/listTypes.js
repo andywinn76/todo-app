@@ -2,19 +2,25 @@
 // You can add more types or tweak defaults without touching UI components.
 
 export const LIST_TYPES = [
-  "Personal",
-  "Work",
-  "Groceries",
-  "Errands",
-  "Projects",
+  // "Personal",
+  // "Work",
+  // "Groceries",
+  // "Errands",
+  // "Projects",
+  "todo",
+  "grocery",
+  "note",
 ];
 
 export const LIST_TYPE_LABELS = {
-  Personal: "Personal",
-  Work: "Work",
-  Groceries: "Groceries",
-  Errands: "Errands",
-  Projects: "Projects",
+  // Personal: "Personal",
+  // Work: "Work",
+  // Groceries: "Groceries",
+  // Errands: "Errands",
+  // Projects: "Projects",
+  todo: "Todo",
+  grocery: "Grocery",
+  note: "Note",
 };
 
 // Tailwind utility classes for subtle color-coding per type.
