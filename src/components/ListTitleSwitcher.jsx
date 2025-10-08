@@ -28,8 +28,8 @@ export default function ListTitleSwitcher({
         onClick={() => onOpenManage?.()}
         title="Manage lists"
       >
-        <span className="truncate">{activeName}</span>
         <FaChevronDown className="ml-1 shrink-0" />
+        <span className="truncate">{activeName}</span>
       </button>
     </div>
   );
