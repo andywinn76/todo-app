@@ -18,6 +18,7 @@ export default function RootLayout({ children }) {
         <link rel="icon" href="/icons/icon-192x192.png" />
       </head>
       <body>
+      <div className="mx-auto max-w-[800px] border border-gray-300">
         <Suspense fallback={null}>
           <AuthProvider>
             <ListsProvider>
@@ -37,6 +38,7 @@ export default function RootLayout({ children }) {
             </ListsProvider>
           </AuthProvider>
         </Suspense>
+        </div>
       </body>
     </html>
   );

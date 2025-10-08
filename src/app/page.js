@@ -96,13 +96,13 @@ export default function Home() {
   if (!user || userLoading) return <p className="p-6">Loading...</p>;
 
   return (
-    <main className="p-6">
+    <main className="px-4 sm:px-6 py-6">
       {/* Header row */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
         {/* LEFT */}
         <div className="min-w-0 flex-1">
           <div className="min-w-0 flex items-center gap-2">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 sm:max-w-[70%]">
               <div className="truncate">
                 <ListTitleSwitcher onOpenManage={() => setManageOpen(true)} />
               </div>
