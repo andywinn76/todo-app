@@ -82,6 +82,7 @@ export default function SnapshotPage() {
   return (
     <main className="p-6 space-y-8">
       <h1 className="text-2xl font-bold">Code Snapshot</h1>
+      <h2>Total files found: {FILES.length}</h2>      
       {FILES.map((file) => (
         <section key={file} className="space-y-2">
           <h2 className="text-lg font-semibold">{file}</h2>
