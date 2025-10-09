@@ -107,34 +107,9 @@ export default function Home() {
                 <ListTitleSwitcher onOpenManage={() => setManageOpen(true)} />
               </div>
             </div>
-          </div>
 
-          {activeListId && isOwner && (
-            <ShareListInline
-              listId={activeListId}
-              currentUserId={user.id}
-              isOpen={shareOpen}
-              onOpenChange={setShareOpen}
-              onDone={() => setShareOpen(false)}
-              render="form-below"
-            />
-          )}
-
-          {lists.length > 0 && (activeListType || ownerLabel) && (
-            <p className="mt-1 truncate text-sm text-gray-500">
-              <ListTypeBadge type={activeListType} className="mr-2" />
-              {activeListType && ownerLabel ? " • " : null}
-              {ownerLabel || null}
-            </p>
-          )}
-        </div>
-
-        {/* RIGHT */}
-        {(hasValidActive && cfg.supportsAdd) || activeListId ? (
-          <div className="shrink-0 flex items-center gap-2">
-            {/* Actions sit to the LEFT of the Add button */}
             {activeListId && (
-              <>
+              <div className="flex items-center gap-2 shrink-0">
                 {isOwner && (
                   <ShareListInline
                     listId={activeListId}
@@ -159,35 +134,57 @@ export default function Home() {
                     await refreshLists?.();
                   }}
                 />
-              </>
-            )}
-
-            {/* Add / Cancel button */}
-            {hasValidActive && cfg.supportsAdd && (
-              <button
-                onClick={() => setAddOpen((v) => !v)}
-                className={`rounded px-4 py-2 font-semibold border ${
-                  addOpen
-                    ? "bg-gray-200 hover:bg-gray-300"
-                    : "bg-green-500 hover:bg-green-600 text-white"
-                }`}
-                aria-expanded={addOpen}
-                aria-label={addOpen ? "Cancel" : cfg.addLabel || "Add"}
-                title={addOpen ? "Cancel" : cfg.addLabel || "Add"}
-                type="button"
-              >
-                {/* Mobile symbol */}
-                <span className="sm:hidden text-xl leading-none">
-                  {addOpen ? "×" : "+"}
-                </span>
-                {/* Desktop label */}
-                <span className="hidden sm:inline">
-                  {addOpen ? "Cancel" : cfg.addLabel || "Add"}
-                </span>
-              </button>
+              </div>
             )}
           </div>
-        ) : null}
+
+          {activeListId && isOwner && (
+            <ShareListInline
+              listId={activeListId}
+              currentUserId={user.id}
+              isOpen={shareOpen}
+              onOpenChange={setShareOpen}
+              onDone={() => setShareOpen(false)}
+              render="form-below"
+            />
+          )}
+
+          {lists.length > 0 && (activeListType || ownerLabel) && (
+            <p className="mt-1 truncate text-sm text-gray-500">
+              {/* {activeListType ? <>Type: {activeListType}</> : null} */}
+              <ListTypeBadge type={activeListType} className="mr-2" />
+              {activeListType && ownerLabel ? " • " : null}
+              {ownerLabel || null}
+            </p>
+          )}
+        </div>
+
+        {/* RIGHT */}
+        {hasValidActive && cfg.supportsAdd && (
+          <div className="shrink-0">
+            <button
+              onClick={() => setAddOpen((v) => !v)}
+              className={`rounded px-4 py-2 font-semibold border ${
+                addOpen
+                  ? "bg-gray-200 hover:bg-gray-300"
+                  : "bg-green-500 hover:bg-green-600 text-white"
+              }`}
+              aria-expanded={addOpen}
+              aria-label={addOpen ? "Cancel" : cfg.addLabel || "Add"}
+              title={addOpen ? "Cancel" : cfg.addLabel || "Add"}
+              type="button"
+            >
+              {/* Mobile symbol */}
+              <span className="sm:hidden text-xl leading-none">
+                {addOpen ? "×" : "+"}
+              </span>
+              {/* Desktop label */}
+              <span className="hidden sm:inline">
+                {addOpen ? "Cancel" : cfg.addLabel || "Add"}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Body */}
