@@ -104,19 +104,21 @@ export default function NoteEditor({ user, listId }) {
         placeholder="Write your notes… (Enter for a new line)"
         className="w-full flex-1 min-h-[280px] md:min-h-0 border rounded p-3 leading-6 resize-y"
       />
-      <div className="flex items-center justify-between"> 
-      {/*Autosaving notation */}
+      {/* <div className="flex items-center justify-between"></div> */}
+      
+      <div className="sticky bottom-0 bg-white/90 backdrop-blur border-t py-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+        {/*Autosaving notation */}
         <div className="text-sm text-gray-500">{subtitle}</div>
-      </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={saveNow}
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
-          disabled={saving}
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={saveNow}
+            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+            disabled={saving}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
       </div>
     </section>
   );
