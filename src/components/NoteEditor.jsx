@@ -96,12 +96,13 @@ export default function NoteEditor({ user, listId }) {
   }, [saving, lastSavedAt]);
 
   return (
-    <section className="space-y-3">
+    // <section className="space-y-3">
+    <section className="flex min-h-[100dvh] flex-col gap-3">
       <textarea
         value={body}
         onChange={onChange}
         placeholder="Write your notes… (Enter for a new line)"
-        className="w-full min-h-[280px] border rounded p-3 leading-6"
+        className="w-full flex-1 min-h-[280px] md:min-h-0 border rounded p-3 leading-6 resize-y"
       />
       <div className="flex items-center justify-between"> 
       {/*Autosaving notation */}
