@@ -424,8 +424,9 @@ export default function ManageListsDrawer({
                           }}
                           className="min-w-0 w-full px-2 py-1"
                         >
-                          <div className="backdrop-blur-sm bg-white/5 rounded-md p-2 shadow-md flex flex-col sm:flex-row sm:items-center sm:gap-1 gap-2">
+                          <div className="backdrop-blur-sm bg-blue-500/5 border border-black/20 rounded-md p-2 shadow-md flex flex-col sm:flex-row sm:items-center sm:gap-1 gap-2">
                             <span>Renaming list...</span>
+                            
                             <input
                               autoFocus
                               type="text"
