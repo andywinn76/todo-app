@@ -412,49 +412,54 @@ export default function ManageListsDrawer({
                     {/* Rename (owners only) */}
                     {isOwner(list) &&
                       (renamingId === list.id ? (
-                        // ✅ Show the rename form
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            if (!renaming) saveRename(list);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape") cancelRename();
-                          }}
-                          className="min-w-0 flex-1 flex items-center gap-2 px-2 py-1"
-                        >
-                          <input
-                            autoFocus
-                            type="text"
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.target.value)}
-                            className="w-full border rounded px-2 py-1"
-                            placeholder="List name"
-                            disabled={renaming || busy || creating}
-                            aria-label="Rename list"
-                          />
-                          <button
-                            type="submit"
-                            disabled={
-                              renaming ||
-                              !renameValue.trim() ||
-                              renameValue.trim() === (list.name || "")
-                            }
-                            className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                            aria-label="Save new name"
-                          >
-                            {renaming ? "Saving…" : "Save"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={cancelRename}
-                            disabled={renaming}
-                            className="text-sm px-3 py-1 rounded border hover:bg-gray-50"
-                            aria-label="Cancel rename"
-                          >
-                            Cancel
-                          </button>
-                        </form>
+                        // rename form
+                        
+                        
+  <form
+    onSubmit={(e) => {
+    e.preventDefault();
+    if (!renaming) saveRename(list);
+  }}
+  onKeyDown={(e) => {
+    if (e.key === "Escape") cancelRename();
+  }}
+  className="min-w-0 flex flex-col sm:flex-row sm:items-center sm:gap-2 gap-3 w-full px-2 py-1"
+>
+  <input
+    autoFocus
+    type="text"
+    value={renameValue}
+    onChange={(e) => setRenameValue(e.target.value)}
+    className="flex-1 min-w-0 w-full border rounded px-2 py-1"
+    placeholder="List name"
+    disabled={renaming || busy || creating}
+    aria-label="Rename list"
+  />
+  <div className="flex gap-2 sm:mt-0 mt-2 w-full sm:w-auto justify-end">
+    <button
+      type="submit"
+      disabled={
+        renaming ||
+        !renameValue.trim() ||
+        renameValue.trim() === (list.name || "")
+      }
+      className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+      aria-label="Save new name"
+    >
+      {renaming ? "Saving…" : "Save"}
+    </button>
+    <button
+      type="button"
+      onClick={cancelRename}
+      disabled={renaming}
+      className="text-sm px-3 py-1 rounded border hover:bg-gray-50"
+      aria-label="Cancel rename"
+    >
+      Cancel
+    </button>
+  </div>
+</form>
+
                       ) : (
                         // ✏️ Show the pencil when not renaming
                         <button
