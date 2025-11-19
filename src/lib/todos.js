@@ -1,16 +1,6 @@
 import { supabase } from "./supabaseClient";
 
-// //Fetch all todos for a given list (OLD FETCH)
-// export async function fetchTodos(listId) {
-//   const { data, error } = await supabase
-//     .from("todos")
-//     .select("*")
-//     .eq("list_id", listId)
-//     .order("due_date", { ascending: true })
-//     .order("created_at", { ascending: false });
-
-//   return { data, error };
-// }
+//Fetch all todos for a given list
 export async function fetchTodos(listId) {
   if (!listId) return { data: [], error: null };
 
@@ -35,6 +25,7 @@ export async function createTodo(input) {
       userId, // ignored; DB should set created_by DEFAULT auth.uid()
       listId, // camelCase
       list_id, // snake_case
+      progress, // Optional progress field 0-100
     } = input || {};
 
     const listIdNormalized = listId ?? list_id;
@@ -43,15 +34,26 @@ export async function createTodo(input) {
       return { data: null, error: new Error("Missing listId/list_id") };
     }
 
+    // Normalize progress if provided
+    let normalizedProgress = null;
+    if (typeof progress === "number") {
+      const num = Math.round(progress);
+      if (!Number.isNaN(num)) {
+        normalizedProgress = Math.min(100, Math.max(0, num));
+      }
+    }
+
     const payload = {
       title: (title ?? "").trim(),
       description: (description ?? "").trim() || null,
-      due_date, 
+      due_date,
       priority,
       list_id: String(listIdNormalized),
+      // Only send progress if we successfully normalized it
+      ...(normalizedProgress !== null ? { progress: normalizedProgress } : {}),
     };
 
-    console.log("createTodo payload", payload); 
+    // console.log("createTodo payload", payload);
 
     const { data, error } = await supabase
       .from("todos")
@@ -80,7 +82,7 @@ export async function toggleTodo(id, completed) {
 }
 
 /**
- * Update arbitrary fields (title, description, due_date, priority, etc.)
+ * Update arbitrary fields (title, description, due_date, priority, progress, etc.)
  */
 export async function updateTodo(id, updates) {
   const sanitized = { ...updates };
@@ -91,6 +93,24 @@ export async function updateTodo(id, updates) {
     sanitized.description = sanitized.description.trim();
   }
 
+  // NEW: normalize progress if present
+  if ("progress" in sanitized) {
+    const value = sanitized.progress;
+
+    if (value == null) {
+      // allow explicitly clearing progress
+      sanitized.progress = null;
+    } else {
+      const num = Math.round(Number(value));
+      if (Number.isNaN(num)) {
+        // bad value – don’t send it at all
+        delete sanitized.progress;
+      } else {
+        sanitized.progress = Math.min(100, Math.max(0, num));
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from("todos")
     .update(sanitized)
@@ -99,9 +119,7 @@ export async function updateTodo(id, updates) {
   return { data, error };
 }
 
-/**
- * Delete a todo by id.
- */
+//Delete a todo by ID
 export async function deleteTodo(id) {
   const { data, error } = await supabase.from("todos").delete().eq("id", id);
   return { data, error };

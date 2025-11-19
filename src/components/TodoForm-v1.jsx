@@ -24,16 +24,6 @@ export default function TodoForm({ onCreated }) {
   const [dueDate, setDueDate] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // NEW STATE: progress tracking
-  const [trackProgress, setTrackProgress] = useState(false);
-  const [progress, setProgress] = useState(0);
-
-  // Color for slider (same logic as TodoItem)
-  const progressColor = useMemo(() => {
-    const h = Math.min(120, Math.max(0, progress * 1.2));
-    return `hsl(${h}, 70%, 45%)`;
-  }, [progress]);
-
   useEffect(() => {
     if (!activeList) return;
 
@@ -48,7 +38,7 @@ export default function TodoForm({ onCreated }) {
       representation: "date",
     });
     setDueDate((prev) => (prev ? prev : newDue));
-  }, [activeList?.id, activeList?.list_type]);
+  }, [activeList?.id, activeList?.list_type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!activeListId || busy) return;
@@ -84,7 +74,6 @@ export default function TodoForm({ onCreated }) {
         priority,
         due_date: dueDate || null,
         list_id: activeListId,
-        ...(trackProgress ? { progress } : {}), // <<< NEW
       };
 
       const { data, error } = await supabase
@@ -98,9 +87,6 @@ export default function TodoForm({ onCreated }) {
       toast.success("Todo added!");
       setTitle("");
       setDescription("");
-      setTrackProgress(false);
-      setProgress(0);
-
       onCreated?.(data);
       requestAnimationFrame(() => titleRef.current?.focus());
     } catch (err) {
@@ -132,7 +118,6 @@ export default function TodoForm({ onCreated }) {
           disabled={!activeListId || busy}
         />
 
-        {/* Description */}
         <textarea
           placeholder="Optional description…"
           value={description}
@@ -141,50 +126,6 @@ export default function TodoForm({ onCreated }) {
           rows={2}
           disabled={!activeListId || busy}
         />
-
-        {/* NEW: Track progress toggle */}
-        <div className="flex items-center gap-2 md:w-full mt-2">
-          <input
-            type="checkbox"
-            id="trackProgress"
-            checked={trackProgress}
-            onChange={(e) => setTrackProgress(e.target.checked)}
-            disabled={!activeListId || busy}
-          />
-          <label htmlFor="trackProgress" className="text-sm text-gray-700">
-            Track progress?
-          </label>
-        </div>
-
-        {/* NEW: Slider (only when tracking enabled) */}
-        {trackProgress && (
-          <div className="flex items-center gap-2 w-full mt-1">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={progress}
-              onChange={(e) => setProgress(Number(e.target.value))}
-              disabled={busy}
-              className="flex-1 appearance-none h-1 rounded-lg bg-gray-200 outline-none
-                [&::-webkit-slider-thumb]:appearance-none
-                [&::-webkit-slider-thumb]:w-4
-                [&::-webkit-slider-thumb]:h-4
-                [&::-webkit-slider-thumb]:rounded-full
-                [&::-webkit-slider-thumb]:bg-white
-                [&::-webkit-slider-thumb]:border
-                [&::-webkit-slider-thumb]:border-gray-400
-                [&::-webkit-slider-thumb]:shadow"
-              style={{
-                background: `linear-gradient(to right, ${progressColor} ${progress}%, #e5e7eb ${progress}%)`,
-              }}
-            />
-            <span className="text-xs text-gray-600 w-8 text-right">
-              {progress}%
-            </span>
-          </div>
-        )}
 
         {/* Priority */}
         <select
