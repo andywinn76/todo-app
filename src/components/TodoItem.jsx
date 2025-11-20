@@ -2,31 +2,24 @@
 
 import { memo, useMemo, useCallback } from "react";
 import { format } from "date-fns";
+import { FaPencilAlt } from "react-icons/fa";
 import DeleteIconButton from "./DeleteIconButton";
 
-/**
- * Presentational, memoized row.
- * Parent handles data mutations (optimistic toggle/delete/update).
- */
-function TodoItem({ todo, onToggle, onDelete, onUpdate, busy = false }) {
-  // Compute the slider track color using an HSL gradient (0–120 hue)
+function TodoItem({ todo, onToggle, onDelete, onUpdate, onEdit, busy = false }) {
   const progressColor = useMemo(() => {
     if (todo.progress == null) return null;
-    const h = Math.min(120, Math.max(0, todo.progress * 1.2)); // red→green
+    const h = Math.min(120, Math.max(0, todo.progress * 1.2));
     return `hsl(${h}, 70%, 45%)`;
   }, [todo.progress]);
 
-  // Handle slider changes
   const handleProgressChange = useCallback(
     (e) => {
       const next = Number(e.target.value);
       if (Number.isNaN(next)) return;
 
       if (next === 100) {
-        // Reaching 100%: mark complete
         onUpdate?.({ progress: 100, completed: true });
       } else {
-        // Any value < 100: mark as not complete
         onUpdate?.({ progress: next, completed: false });
       }
     },
@@ -48,26 +41,24 @@ function TodoItem({ todo, onToggle, onDelete, onUpdate, busy = false }) {
       />
 
       <div className="min-w-0 flex-1">
-        {/* TITLE */}
         <div className="flex items-center gap-2">
           <p
             className={`truncate font-medium ${
-              todo.completed ? "line-through text-gray-500" : "text-gray-900"
+              todo.completed
+                ? "line-through text-gray-500"
+                : "text-gray-900"
             }`}
-            title={todo.title}
           >
             {todo.title}
           </p>
         </div>
 
-        {/* DESCRIPTION */}
         {todo.description && (
           <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap">
             {todo.description}
           </p>
         )}
 
-        {/* PROGRESS SLIDER (only if enabled) */}
         {todo.progress != null && (
           <div className="mt-2 flex items-center gap-2">
             <input
@@ -76,7 +67,6 @@ function TodoItem({ todo, onToggle, onDelete, onUpdate, busy = false }) {
               max="100"
               step="1"
               value={todo.progress}
-              // keep draggable even if busy
               onChange={handleProgressChange}
               className="flex-1 appearance-none h-1 rounded-lg bg-gray-200 outline-none cursor-pointer
                          [&::-webkit-slider-thumb]:appearance-none
@@ -99,10 +89,9 @@ function TodoItem({ todo, onToggle, onDelete, onUpdate, busy = false }) {
           </div>
         )}
 
-        {/* META: Due date + Priority */}
         <div className="mt-1 text-xs text-gray-500 flex items-center gap-3">
           {todo.due_date && (
-            <span title="Due date">
+            <span>
               Due {format(new Date(todo.due_date), "MMM d, yyyy")}
             </span>
           )}
@@ -116,7 +105,6 @@ function TodoItem({ todo, onToggle, onDelete, onUpdate, busy = false }) {
                   ? "bg-amber-100 text-amber-800 ring-amber-200"
                   : "bg-gray-100 text-gray-700 ring-gray-200"
               }`}
-              title={`Priority: ${todo.priority}`}
             >
               {todo.priority}
             </span>
@@ -124,13 +112,21 @@ function TodoItem({ todo, onToggle, onDelete, onUpdate, busy = false }) {
         </div>
       </div>
 
-      {/* DELETE */}
+      {/* Edit + Delete */}
       <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          className="text-blue-600 hover:text-blue-700 p-1"
+          disabled={busy}
+          onClick={() => onEdit?.(todo)}
+          title="Edit item"
+        >
+          <FaPencilAlt className="w-5 h-5" />
+        </button>
+
         <DeleteIconButton
           onClick={() => onDelete?.()}
           disabled={busy}
-          title="Delete item"
-          aria-label="Delete item"
         />
       </div>
     </li>

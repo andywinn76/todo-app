@@ -24,15 +24,19 @@ export default function TodoForm({ onCreated }) {
   const [dueDate, setDueDate] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // NEW STATE: progress tracking
-  const [trackProgress, setTrackProgress] = useState(false);
-  const [progress, setProgress] = useState(0);
+  // progress tracking
+  const [trackProgressEnabled, setTrackProgressEnabled] = useState(false);
+  // const [progress, setProgress] = useState(0);
 
-  // Color for slider (same logic as TodoItem)
-  const progressColor = useMemo(() => {
-    const h = Math.min(120, Math.max(0, progress * 1.2));
-    return `hsl(${h}, 70%, 45%)`;
-  }, [progress]);
+  const [dueDateEnabled, setDueDateEnabled] = useState(false);
+  const [priorityEnabled, setPriorityEnabled] = useState(false);
+  const [descriptionEnabled, setDescriptionEnabled] = useState(false);
+
+  // Color for slider
+  // const progressColor = useMemo(() => {
+  //   const h = Math.min(120, Math.max(0, progress * 1.2));
+  //   return `hsl(${h}, 70%, 45%)`;
+  // }, [progress]);
 
   useEffect(() => {
     if (!activeList) return;
@@ -42,13 +46,18 @@ export default function TodoForm({ onCreated }) {
       dueInDays: 3,
     };
 
-    setPriority(defaults.priority);
+    // Only set defaults IF the option is enabled
+    if (priorityEnabled) {
+      setPriority(defaults.priority);
+    }
 
-    const newDue = formatISO(addDays(new Date(), defaults.dueInDays), {
-      representation: "date",
-    });
-    setDueDate((prev) => (prev ? prev : newDue));
-  }, [activeList?.id, activeList?.list_type]);
+    if (dueDateEnabled) {
+      const newDue = formatISO(addDays(new Date(), defaults.dueInDays), {
+        representation: "date",
+      });
+      setDueDate((prev) => (prev ? prev : newDue));
+    }
+  }, [activeList?.id, activeList?.list_type, priorityEnabled, dueDateEnabled]);
 
   useEffect(() => {
     if (!activeListId || busy) return;
@@ -80,12 +89,34 @@ export default function TodoForm({ onCreated }) {
 
       const payload = {
         title: title.trim(),
-        description: description.trim() || null,
-        priority,
-        due_date: dueDate || null,
         list_id: activeListId,
-        ...(trackProgress ? { progress } : {}), // <<< NEW
       };
+
+      // Add description only when enabled
+      if (descriptionEnabled) {
+        payload.description = description.trim() || null;
+      } else {
+        payload.description = null;
+      }
+
+      // Add priority only when enabled
+      if (priorityEnabled) {
+        payload.priority = priority;
+      } else {
+        payload.priority = null;
+      }
+
+      // Add due date only when enabled
+      if (dueDateEnabled) {
+        payload.due_date = dueDate || null;
+      } else {
+        payload.due_date = null;
+      }
+
+      // Add progress only when enabled
+      if (trackProgressEnabled) {
+        payload.progress = 0;
+      }
 
       const { data, error } = await supabase
         .from("todos")
@@ -98,8 +129,7 @@ export default function TodoForm({ onCreated }) {
       toast.success("Todo added!");
       setTitle("");
       setDescription("");
-      setTrackProgress(false);
-      setProgress(0);
+      setTrackProgressEnabled(false);
 
       onCreated?.(data);
       requestAnimationFrame(() => titleRef.current?.focus());
@@ -124,7 +154,7 @@ export default function TodoForm({ onCreated }) {
           placeholder={
             activeList?.list_type === "Groceries"
               ? "e.g., Milk, eggs, spinach…"
-              : "What needs doing?"
+              : "Add an item..."
           }
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -132,32 +162,67 @@ export default function TodoForm({ onCreated }) {
           disabled={!activeListId || busy}
         />
 
-        {/* Description */}
-        <textarea
-          placeholder="Optional description…"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full rounded border px-3 py-2 text-sm md:order-last md:basis-full"
-          rows={2}
-          disabled={!activeListId || busy}
-        />
-
-        {/* NEW: Track progress toggle */}
-        <div className="flex items-center gap-2 md:w-full mt-2">
+        {/* Option toggles */}
+        <div className="flex items-center gap-1 md:w-full mt-2">
           <input
             type="checkbox"
-            id="trackProgress"
-            checked={trackProgress}
-            onChange={(e) => setTrackProgress(e.target.checked)}
+            id="trackProgressEnabled"
+            checked={trackProgressEnabled}
+            onChange={(e) => setTrackProgressEnabled(e.target.checked)}
             disabled={!activeListId || busy}
           />
-          <label htmlFor="trackProgress" className="text-sm text-gray-700">
-            Track progress?
+          <label
+            htmlFor="trackProgressEnabled"
+            className="text-sm text-gray-700 mr-3"
+          >
+            Track progress
+          </label>
+
+          <input
+            type="checkbox"
+            id="dueDateEnabled"
+            checked={dueDateEnabled}
+            onChange={(e) => setDueDateEnabled(e.target.checked)}
+            disabled={!activeListId || busy}
+          />
+          <label
+            htmlFor="dueDateEnabled"
+            className="text-sm text-gray-700 mr-3"
+          >
+            Add due date
+          </label>
+
+          <input
+            type="checkbox"
+            id="priorityEnabled"
+            checked={priorityEnabled}
+            onChange={(e) => setPriorityEnabled(e.target.checked)}
+            disabled={!activeListId || busy}
+          />
+          <label
+            htmlFor="priorityEnabled"
+            className="text-sm text-gray-700 mr-3"
+          >
+            Add priority
+          </label>
+
+          <input
+            type="checkbox"
+            id="descriptionEnabled"
+            checked={descriptionEnabled}
+            onChange={(e) => setDescriptionEnabled(e.target.checked)}
+            disabled={!activeListId || busy}
+          />
+          <label
+            htmlFor="descriptionEnabled"
+            className="text-sm text-gray-700 mr-3"
+          >
+            Add description
           </label>
         </div>
 
-        {/* NEW: Slider (only when tracking enabled) */}
-        {trackProgress && (
+        {/* NEW: Slider (only when tracking enabled) Disabled for now for UI/UX testing */}
+        {/* {trackProgress && (
           <div className="flex items-center gap-2 w-full mt-1">
             <input
               type="range"
@@ -184,30 +249,46 @@ export default function TodoForm({ onCreated }) {
               {progress}%
             </span>
           </div>
-        )}
+        )} */}
 
         {/* Priority */}
-        <select
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          className="rounded border px-2 py-2 text-sm md:w-40"
-          disabled={!activeListId || busy}
-        >
-          {PRIORITIES.map((p) => (
-            <option key={p} value={p}>
-              Priority: {p}
-            </option>
-          ))}
-        </select>
+        {priorityEnabled && (
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className="rounded border px-2 py-2 text-sm md:w-40"
+            disabled={!activeListId || busy}
+          >
+            {PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                Priority: {p}
+              </option>
+            ))}
+          </select>
+        )}
 
         {/* Due date */}
-        <input
-          type="date"
-          value={dueDate || ""}
-          onChange={(e) => setDueDate(e.target.value)}
-          className="rounded border px-2 py-2 text-sm md:w-44"
-          disabled={!activeListId || busy}
-        />
+        {dueDateEnabled && (
+          <input
+            type="date"
+            value={dueDate || ""}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="rounded border px-2 py-2 text-sm md:w-44"
+            disabled={!activeListId || busy}
+          />
+        )}
+
+        {/* Description */}
+        {descriptionEnabled && (
+          <textarea
+            placeholder="Optional description…"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full rounded border px-3 py-2 text-sm md:order-last md:basis-full"
+            rows={2}
+            disabled={!activeListId || busy}
+          />
+        )}
 
         {/* Submit */}
         <button

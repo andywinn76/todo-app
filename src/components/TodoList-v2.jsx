@@ -4,7 +4,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import TodoItem from "@/components/TodoItem";
-import EditTodoDrawer from "@/components/EditTodoDrawer";
 import { useLists } from "@/components/ListsProvider";
 import {
   fetchTodos as apiFetchTodos,
@@ -20,22 +19,16 @@ export default function TodoList({ lastCreated }) {
 
   // Track in-flight operations per-todo
   const [busyIds, setBusyIds] = useState(() => new Set());
-  const setBusyFor = useCallback((id, flag) => {
+  const setBusyFor = useCallback((id, isBusy) => {
     setBusyIds((prev) => {
       const next = new Set(prev);
-      flag ? next.add(id) : next.delete(id);
+      if (isBusy) next.add(id);
+      else next.delete(id);
       return next;
     });
   }, []);
 
-  // NEW — editing drawer
-  const [editingTodo, setEditingTodo] = useState(null);
-  const openEdit = useCallback((todo) => setEditingTodo(todo), []);
-  const closeEdit = useCallback(() => setEditingTodo(null), []);
-
-  // ------------------------------------------------------------
-  // 1. INITIAL FETCH WHEN ACTIVE LIST CHANGES
-  // ------------------------------------------------------------
+  // Initial fetch whenever the active list changes
   useEffect(() => {
     let cancelled = false;
 
@@ -44,11 +37,9 @@ export default function TodoList({ lastCreated }) {
         setTodos([]);
         return;
       }
-
       setLoading(true);
 
       const { data, error } = await apiFetchTodos(activeListId);
-
       if (!cancelled) {
         if (error) {
           console.error("Error fetching todos:", error);
@@ -67,14 +58,13 @@ export default function TodoList({ lastCreated }) {
     };
   }, [activeListId]);
 
-  // ------------------------------------------------------------
-  // 2. OPTIMISTIC APPEND FOR NEWLY CREATED TODO
-  // ------------------------------------------------------------
+  // Optimistic append for newly created todo
   const lastHandledIdRef = useRef(null);
   useEffect(() => {
     if (!lastCreated) return;
     if (!activeListId) return;
     if (lastCreated.list_id !== activeListId) return;
+
     if (lastHandledIdRef.current === lastCreated.id) return;
 
     setTodos((prev) => {
@@ -86,22 +76,25 @@ export default function TodoList({ lastCreated }) {
     lastHandledIdRef.current = lastCreated.id;
   }, [lastCreated, activeListId]);
 
-  // ------------------------------------------------------------
-  // 3. TOGGLE COMPLETION (PROGRESS-AWARE)
-  // ------------------------------------------------------------
+  // ----------------------------------------------------------
+  // TOGGLE COMPLETION (now also keeps progress in sync)
+  // ----------------------------------------------------------
   const handleToggle = useCallback(
     async (id, nextCompleted) => {
+      // Look up current todo to decide how progress should change
       const current = todos.find((t) => t.id === id);
-
       let newProgress =
         current && current.progress != null ? current.progress : null;
 
       if (newProgress != null) {
         if (nextCompleted) {
+          // Checking the box: force to 100%
           newProgress = 100;
         } else if (newProgress === 100) {
+          // Unchecking from 100%: reset to 0
           newProgress = 0;
         }
+        // If progress was e.g. 50 and we uncheck, leave as 50
       }
 
       // Optimistic update
@@ -130,6 +123,7 @@ export default function TodoList({ lastCreated }) {
 
       if (error) {
         toast.error("Couldn’t update the todo.");
+        // Refetch to restore authoritative state
         const { data: refetch, error: refetchErr } = await apiFetchTodos(
           activeListId
         );
@@ -144,14 +138,15 @@ export default function TodoList({ lastCreated }) {
     [todos, activeListId, setBusyFor]
   );
 
-  // ------------------------------------------------------------
-  // 4. GENERIC UPDATE (EDIT DRAWER + PROGRESS SLIDER)
-  // ------------------------------------------------------------
+  // ----------------------------------------------------------
+  // UPDATE (partial updates: progress, title, description, etc.)
+  // ----------------------------------------------------------
   const handleUpdate = useCallback(
     async (id, partial) => {
       // Optimistic update
-      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, ...partial } : t)));
-
+      setTodos((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...partial } : t))
+      );
       setBusyFor(id, true);
 
       const { error } = await apiUpdateTodo(id, partial);
@@ -174,13 +169,14 @@ export default function TodoList({ lastCreated }) {
     [activeListId, setBusyFor]
   );
 
-  // ------------------------------------------------------------
-  // 5. DELETE TODO (OPTIMISTIC WITH RESTORE ON FAIL)
-  // ------------------------------------------------------------
+  // ----------------------------------------------------------
+  // DELETE (existing behavior)
+  // ----------------------------------------------------------
   const handleDelete = useCallback(
     async (id) => {
       let removed = null;
 
+      // optimistic remove
       setTodos((prev) => {
         const idx = prev.findIndex((t) => t.id === id);
         if (idx === -1) return prev;
@@ -220,9 +216,6 @@ export default function TodoList({ lastCreated }) {
     [activeListId, setBusyFor]
   );
 
-  // ------------------------------------------------------------
-  // 6. EMPTY STATE / RENDER
-  // ------------------------------------------------------------
   const isEmpty = useMemo(
     () => !loading && todos.length === 0,
     [loading, todos.length]
@@ -249,24 +242,12 @@ export default function TodoList({ lastCreated }) {
               key={todo.id}
               todo={todo}
               busy={busyIds.has(todo.id)}
-              onToggle={(next) => handleToggle(todo.id, next)}
+              onToggle={(nextCompleted) => handleToggle(todo.id, nextCompleted)}
               onUpdate={(partial) => handleUpdate(todo.id, partial)}
               onDelete={() => handleDelete(todo.id)}
-              onEdit={openEdit}
             />
           ))}
         </ul>
-      )}
-
-      {/* --------------------------------------------------------
-           EDIT DRAWER
-         -------------------------------------------------------- */}
-      {editingTodo && (
-        <EditTodoDrawer
-          todo={editingTodo}
-          onClose={closeEdit}
-          onSave={(partial) => handleUpdate(editingTodo.id, partial)}
-        />
       )}
     </div>
   );
