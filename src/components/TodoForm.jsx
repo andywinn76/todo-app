@@ -146,7 +146,7 @@ export default function TodoForm({ onCreated }) {
       onSubmit={handleSubmit}
       className="rounded border bg-white p-3 shadow-sm"
     >
-      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
+      <div className="flex flex-col gap-3">
         {/* Title */}
         <input
           type="text"
@@ -163,119 +163,106 @@ export default function TodoForm({ onCreated }) {
         />
 
         {/* Option toggles */}
-        <div className="flex items-center gap-1 md:w-full mt-2">
-          <input
-            type="checkbox"
-            id="trackProgressEnabled"
-            checked={trackProgressEnabled}
-            onChange={(e) => setTrackProgressEnabled(e.target.checked)}
-            disabled={!activeListId || busy}
-          />
-          <label
-            htmlFor="trackProgressEnabled"
-            className="text-sm text-gray-700 mr-3"
-          >
-            Track progress
-          </label>
+        <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-2 md:flex md:flex-wrap md:items-center">
+          {/* Track progress */}
+          <div className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              id="trackProgressEnabled"
+              checked={trackProgressEnabled}
+              onChange={(e) => setTrackProgressEnabled(e.target.checked)}
+              disabled={!activeListId || busy}
+            />
+            <label
+              htmlFor="trackProgressEnabled"
+              className="text-sm text-gray-700"
+            >
+              Track progress
+            </label>
+          </div>
 
-          <input
-            type="checkbox"
-            id="dueDateEnabled"
-            checked={dueDateEnabled}
-            onChange={(e) => setDueDateEnabled(e.target.checked)}
-            disabled={!activeListId || busy}
-          />
-          <label
-            htmlFor="dueDateEnabled"
-            className="text-sm text-gray-700 mr-3"
-          >
-            Add due date
-          </label>
+          {/* Add due date */}
+          <div className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              id="dueDateEnabled"
+              checked={dueDateEnabled}
+              onChange={(e) => setDueDateEnabled(e.target.checked)}
+              disabled={!activeListId || busy}
+            />
+            <label htmlFor="dueDateEnabled" className="text-sm text-gray-700">
+              Add due date
+            </label>
+          </div>
 
-          <input
-            type="checkbox"
-            id="priorityEnabled"
-            checked={priorityEnabled}
-            onChange={(e) => setPriorityEnabled(e.target.checked)}
-            disabled={!activeListId || busy}
-          />
-          <label
-            htmlFor="priorityEnabled"
-            className="text-sm text-gray-700 mr-3"
-          >
-            Add priority
-          </label>
+          {/* Add priority */}
+          <div className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              id="priorityEnabled"
+              checked={priorityEnabled}
+              onChange={(e) => setPriorityEnabled(e.target.checked)}
+              disabled={!activeListId || busy}
+            />
+            <label htmlFor="priorityEnabled" className="text-sm text-gray-700">
+              Add priority
+            </label>
+          </div>
 
-          <input
-            type="checkbox"
-            id="descriptionEnabled"
-            checked={descriptionEnabled}
-            onChange={(e) => setDescriptionEnabled(e.target.checked)}
-            disabled={!activeListId || busy}
-          />
-          <label
-            htmlFor="descriptionEnabled"
-            className="text-sm text-gray-700 mr-3"
-          >
-            Add description
-          </label>
+          {/* Add description */}
+          <div className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              id="descriptionEnabled"
+              checked={descriptionEnabled}
+              onChange={(e) => setDescriptionEnabled(e.target.checked)}
+              disabled={!activeListId || busy}
+            />
+            <label
+              htmlFor="descriptionEnabled"
+              className="text-sm text-gray-700"
+            >
+              Add description
+            </label>
+          </div>
         </div>
 
-        {/* NEW: Slider (only when tracking enabled) Disabled for now for UI/UX testing */}
-        {/* {trackProgress && (
-          <div className="flex items-center gap-2 w-full mt-1">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={progress}
-              onChange={(e) => setProgress(Number(e.target.value))}
-              disabled={busy}
-              className="flex-1 appearance-none h-1 rounded-lg bg-gray-200 outline-none
-                [&::-webkit-slider-thumb]:appearance-none
-                [&::-webkit-slider-thumb]:w-4
-                [&::-webkit-slider-thumb]:h-4
-                [&::-webkit-slider-thumb]:rounded-full
-                [&::-webkit-slider-thumb]:bg-white
-                [&::-webkit-slider-thumb]:border
-                [&::-webkit-slider-thumb]:border-gray-400
-                [&::-webkit-slider-thumb]:shadow"
-              style={{
-                background: `linear-gradient(to right, ${progressColor} ${progress}%, #e5e7eb ${progress}%)`,
-              }}
-            />
-            <span className="text-xs text-gray-600 w-8 text-right">
-              {progress}%
-            </span>
+        {/* Date + Priority row (same row when both enabled) */}
+        {(dueDateEnabled || priorityEnabled) && (
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:flex-wrap">
+            {/* Due date */}
+            {dueDateEnabled && (
+              <>
+                <span>Due:</span>
+                <input
+                  type="date"
+                  value={dueDate || ""}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="rounded border px-2 py-2 text-sm md:w-44"
+                  disabled={!activeListId || busy}
+                />
+              </>
+            )}
+
+            {/* Priority */}
+            {priorityEnabled && (
+              <>
+                <span>Priority:</span>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                  className="rounded border px-2 py-2 text-sm md:w-40"
+                  disabled={!activeListId || busy}
+                >
+                  {PRIORITIES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
-        )} */}
-
-        {/* Priority */}
-        {priorityEnabled && (
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-            className="rounded border px-2 py-2 text-sm md:w-40"
-            disabled={!activeListId || busy}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                Priority: {p}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Due date */}
-        {dueDateEnabled && (
-          <input
-            type="date"
-            value={dueDate || ""}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="rounded border px-2 py-2 text-sm md:w-44"
-            disabled={!activeListId || busy}
-          />
         )}
 
         {/* Description */}
@@ -284,17 +271,17 @@ export default function TodoForm({ onCreated }) {
             placeholder="Optional description…"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded border px-3 py-2 text-sm md:order-last md:basis-full"
+            className="w-full rounded border px-3 py-2 text-sm"
             rows={2}
             disabled={!activeListId || busy}
           />
         )}
 
-        {/* Submit */}
+        {/* Submit – always at the bottom */}
         <button
           type="submit"
           disabled={!activeListId || busy}
-          className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+          className="self-start rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {busy ? "Adding..." : "Add"}
         </button>
