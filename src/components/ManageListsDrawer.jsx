@@ -26,11 +26,7 @@ function TypePicker({ value, onChange, disabled, id = "drawer-list-type" }) {
         <option value="todo">Todo</option>
         <option value="grocery">Grocery</option>
         <option value="note">Note</option>
-        {/* {LIST_TYPES.map((type) => (
-          <option key={type} value={type}>
-            {LIST_TYPE_LABELS[type] ?? type}
-          </option>
-        ))} */}
+        <option value="secure_note">Secure Note</option>
       </select>
     </>
   );

@@ -11,6 +11,7 @@ import NoteEditor from "@/components/NoteEditor";
 import ListActions from "@/components/ListActions";
 import ManageListsDrawer from "@/components/ManageListsDrawer";
 import ListTitleSwitcher from "@/components/ListTitleSwitcher";
+import SecureNotesEditor from "@/components/SecureNotesEditor";
 import { TYPE_CONFIG } from "@/lib/typeConfig";
 import ListTypeBadge from "@/components/ListTypeBadge";
 
@@ -56,7 +57,7 @@ export default function Home() {
 
   const activeList = useMemo(
     () => (hasValidActive ? lists.find((l) => l.id === activeListId) : null),
-    [hasValidActive, lists, activeListId]
+    [hasValidActive, lists, activeListId],
   );
 
   // Robust owner check
@@ -68,7 +69,7 @@ export default function Home() {
   const activeListType = activeList?.type || "todo";
   const cfg = useMemo(
     () => TYPE_CONFIG[activeListType] || {},
-    [activeListType]
+    [activeListType],
   );
 
   // Owner label
@@ -201,7 +202,6 @@ export default function Home() {
             <TodoForm
               user={user}
               onCreated={(row) => {
-                // Optimistic append path: hand the new row to <TodoList /> and close the form
                 setLastCreated(row);
                 setAddOpen(false);
               }}
@@ -209,7 +209,6 @@ export default function Home() {
               setIsActive={setAddOpen}
             />
           )}
-          {/* ⬇️ Send the last created row to TodoList (no refreshTick) */}
           <TodoList lastCreated={lastCreated} />
         </>
       ) : activeListType === "grocery" ? (
@@ -219,9 +218,11 @@ export default function Home() {
           open={addOpen}
           onOpenChange={setAddOpen}
         />
-      ) : (
+      ) : activeListType === "secure_note" ? (
+        <SecureNotesEditor user={user} listId={activeListId} />
+      ) : activeListType === "note" ? (
         <NoteEditor user={user} listId={activeListId} />
-      )}
+      ) : null}
 
       <ManageListsDrawer
         open={manageOpen}
