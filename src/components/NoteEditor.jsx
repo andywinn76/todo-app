@@ -8,6 +8,7 @@ import { Color } from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import { Extension } from "@tiptap/core";
 import LinkExtension from "@tiptap/extension-link";
 import {
   Bold,
@@ -21,6 +22,30 @@ import {
   Link2,
   X,
 } from "lucide-react";
+
+// ---------------------------------------------------------------------------
+// Tab-indent extension
+// In list items, StarterKit already handles Tab (sink/lift). For regular
+// paragraphs, Tab inserts four non-breaking spaces and Shift-Tab is consumed
+// so it doesn't accidentally move browser focus away from the editor.
+// ---------------------------------------------------------------------------
+
+const TabIndent = Extension.create({
+  name: "tabIndent",
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        if (this.editor.isActive("listItem")) return false; // let StarterKit handle it
+        this.editor.commands.insertContent("    ");
+        return true;
+      },
+      "Shift-Tab": () => {
+        if (this.editor.isActive("listItem")) return false;
+        return true; // consume outside lists so focus doesn't jump
+      },
+    };
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Plain-text → HTML migration helper
@@ -161,6 +186,7 @@ export default function NoteEditor({ user, listId }) {
       TextStyle,
       Color,
       Highlight.configure({ multicolor: true }),
+      TabIndent,
       LinkExtension.configure({
         openOnClick: true,
         HTMLAttributes: {
@@ -247,10 +273,13 @@ export default function NoteEditor({ user, listId }) {
   return (
     <section className="flex min-h-[100dvh] flex-col gap-3">
       {/* Editor card */}
-      <div className="flex-1 flex flex-col border rounded shadow-sm overflow-hidden">
+      <div className="flex-1 flex flex-col border rounded shadow-sm">
+
+        {/* ── Sticky toolbar + link bar wrapper ── */}
+        <div className="sticky top-0 z-10 rounded-t">
 
         {/* ── Toolbar ── */}
-        <div className="flex items-center gap-0.5 flex-wrap p-1.5 border-b bg-gray-50">
+        <div className="flex items-center gap-0.5 flex-wrap p-1.5 border-b bg-gray-50 rounded-t">
 
           {/* Bold / Italic / Underline */}
           <ToolbarBtn
@@ -423,6 +452,8 @@ export default function NoteEditor({ user, listId }) {
             </button>
           </div>
         )}
+
+        </div>{/* end sticky wrapper */}
 
         {/* ── Editor content ── */}
         <div className="flex-1">

@@ -9,6 +9,7 @@ import ListActions from "@/components/ListActions";
 import { useLists } from "@/components/ListsProvider";
 import ListTypeBadge from "@/components/ListTypeBadge";
 import { LIST_TYPES, LIST_TYPE_LABELS } from "@/utils/listTypes";
+import { Search } from "lucide-react";
 
 function TypePicker({ value, onChange, disabled, id = "drawer-list-type" }) {
   return (
@@ -60,6 +61,9 @@ export default function ManageListsDrawer({
   const [shareOpenId, setShareOpenId] = useState(null);
   // Optimistic update for sharing state
   const [optimisticNames, setOptimisticNames] = useState({});
+
+  // List filter / search
+  const [filterQuery, setFilterQuery] = useState("");
 
   //Renaming lists state
   const [renamingId, setRenamingId] = useState(null);
@@ -148,6 +152,7 @@ export default function ManageListsDrawer({
     setShareOpenId(null);
     // fresh session of the drawer: clear any stale optimistic names
     setOptimisticNames({});
+    setFilterQuery("");
   }, [open]);
 
   function handleClose() {
@@ -279,22 +284,35 @@ export default function ManageListsDrawer({
                 type="button"
                 onClick={() => setShowCreateForm(true)}
                 disabled={busy || creating}
-                className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                className="rounded w-9 h-9 flex items-center justify-center font-bold text-xl leading-none border bg-green-500 hover:bg-green-600 text-white"
                 aria-controls="create-list-form"
+                aria-label="Add new list"
               >
-                Add New
+                +
               </button>
             )}
 
             <button
               onClick={handleClose}
               disabled={busy || creating}
-              className="text-sm px-3 py-1 rounded border hover:bg-gray-50"
+              className="rounded w-9 h-9 flex items-center justify-center font-bold text-xl leading-none border bg-white hover:bg-gray-100 text-gray-800"
               aria-label="Close manage lists"
             >
-              Close
+              ×
             </button>
           </div>
+        </div>
+
+        {/* Search / filter */}
+        <div className="relative mb-3">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={filterQuery}
+            onChange={(e) => setFilterQuery(e.target.value)}
+            placeholder="Filter lists…"
+            className="w-full border rounded pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
         </div>
 
         {/* Form to create a new list */}
@@ -357,7 +375,21 @@ export default function ManageListsDrawer({
             </p>
           )}
 
-          {lists.map((list) => {
+          {lists.length > 0 && filterQuery.trim() &&
+            lists.filter((l) =>
+              (l.name || "").toLowerCase().includes(filterQuery.toLowerCase())
+            ).length === 0 && (
+            <p className="text-sm text-gray-500 px-1 py-2">
+              No lists match &ldquo;{filterQuery}&rdquo;
+            </p>
+          )}
+
+          {lists
+            .filter((l) =>
+              !filterQuery.trim() ||
+              (l.name || "").toLowerCase().includes(filterQuery.toLowerCase())
+            )
+            .map((list) => {
             const inviting = shareOpenId === list.id;
             const canInvite = isOwner(list);
             const isCurrent = list.id === activeListId;
@@ -365,8 +397,10 @@ export default function ManageListsDrawer({
             return (
               <div
                 key={list.id}
-                className={`rounded border border-gray-400 pl-1 pr-3 py-1 ${
-                  isCurrent ? "border-blue-200 bg-blue-50/30" : ""
+                className={`rounded border pl-1 pr-3 py-1 ${
+                  isCurrent
+                    ? "border-green-400"
+                    : "border-gray-400"
                 }`}
               >
                 {/* Row header */}

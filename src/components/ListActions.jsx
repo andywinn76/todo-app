@@ -19,7 +19,6 @@ export default function ListActions({
   currentUserId,
   onAfterDelete,
   onAfterUnsubscribe,
-  size = "sm",
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -40,12 +39,10 @@ export default function ListActions({
     return cid && (cid === createdBy || cid === ownerId || roleOwner);
   })();
 
-  const btnBase =
-    "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed";
-  const btnSm = size === "sm" ? "h-7" : "h-8";
-  const btnMed = size === "md" ? "h-12" : "h-8";
-  const danger = "hover:bg-red-100 text-red-700";
-  const warn = "border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700";
+  const btnIcon =
+    "inline-flex items-center justify-center rounded p-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed";
+  const danger = "hover:bg-red-100 text-red-600";
+  const warn = "hover:bg-amber-100 text-amber-700";
 
   async function handleDelete() {
     if (!window.confirm(`Delete “${activeList.name}”? This cannot be undone.`))
@@ -96,7 +93,7 @@ export default function ListActions({
           type="button"
           onClick={handleDelete}
           disabled={busy}
-          className={`${btnSm} ${danger}`}
+          className={`${btnIcon} ${danger}`}
           title="Delete list"
         >
           <FaTrashAlt className="w-5 h-5" />
@@ -106,7 +103,7 @@ export default function ListActions({
           type="button"
           onClick={handleUnsubscribe}
           disabled={busy}
-          className={` ${warn}`}
+          className={`${btnIcon} ${warn}`}
           title="Leave this list"
         >
           <FaUserMinus className="w-5 h-5" />

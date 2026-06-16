@@ -191,7 +191,7 @@ export default function SearchDialog({ open, onClose }) {
                 <X className="w-4 h-4" />
               </button>
             )}
-            <kbd className="hidden sm:inline text-xs text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-sans">
+            <kbd className="hidden sm:inline-flex items-center justify-center w-9 h-9 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded font-sans">
               Esc
             </kbd>
           </div>
