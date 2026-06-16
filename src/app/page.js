@@ -14,6 +14,8 @@ import ListTitleSwitcher from "@/components/ListTitleSwitcher";
 import SecureNotesEditor from "@/components/SecureNotesEditor";
 import { TYPE_CONFIG } from "@/lib/typeConfig";
 import ListTypeBadge from "@/components/ListTypeBadge";
+import SearchDialog from "@/components/SearchDialog";
+import { Search } from "lucide-react";
 
 export default function Home() {
   const { user, userLoading } = useRequireAuth();
@@ -23,6 +25,7 @@ export default function Home() {
   const [addOpen, setAddOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // ⬇️ NEW: last created row for optimistic append (sent to <TodoList />)
   const [lastCreated, setLastCreated] = useState(null);
@@ -94,6 +97,18 @@ export default function Home() {
     if (addOpen && !cfg.supportsAdd) setAddOpen(false);
   }, [cfg.supportsAdd, addOpen]);
 
+  // Cmd/Ctrl+K to open search
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   if (!user || userLoading) return <p className="p-6">Loading...</p>;
 
   return (
@@ -131,64 +146,66 @@ export default function Home() {
         </div>
 
         {/* RIGHT */}
-        {(hasValidActive && cfg.supportsAdd) || activeListId ? (
-          <div className="shrink-0 flex items-center gap-2">
-            {/* Actions sit to the LEFT of the Add button */}
-            {activeListId && (
-              <>
-                {isOwner && (
-                  <ShareListInline
-                    listId={activeListId}
-                    currentUserId={user.id}
-                    isOpen={shareOpen}
-                    onOpenChange={setShareOpen}
-                    render="trigger"
-                  />
-                )}
+        <div className="shrink-0 flex items-center gap-2">
+          {/* Search button — always visible */}
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search"
+            title="Search (⌘K)"
+            className="inline-flex items-center justify-center rounded p-1.5 hover:bg-gray-100"
+          >
+            <Search className="w-5 h-5 text-gray-600" />
+          </button>
 
-                <ListActions
-                  activeList={activeList}
+          {/* Per-list actions */}
+          {activeListId && (
+            <>
+              {isOwner && (
+                <ShareListInline
+                  listId={activeListId}
                   currentUserId={user.id}
-                  onAfterDelete={async (deletedId) => {
-                    if (deletedId === activeListId) setActiveListId?.(null);
-                    lastRefreshAt.current = Date.now();
-                    await refreshLists?.();
-                  }}
-                  onAfterUnsubscribe={async (leftId) => {
-                    if (leftId === activeListId) setActiveListId?.(null);
-                    lastRefreshAt.current = Date.now();
-                    await refreshLists?.();
-                  }}
+                  isOpen={shareOpen}
+                  onOpenChange={setShareOpen}
+                  render="trigger"
                 />
-              </>
-            )}
+              )}
 
-            {/* Add / Cancel button */}
-            {hasValidActive && cfg.supportsAdd && (
-              <button
-                onClick={() => setAddOpen((v) => !v)}
-                className={`rounded px-4 py-2 font-semibold border ${
-                  addOpen
-                    ? "bg-gray-200 hover:bg-gray-300"
-                    : "bg-green-500 hover:bg-green-600 text-white"
-                }`}
-                aria-expanded={addOpen}
-                aria-label={addOpen ? "Cancel" : cfg.addLabel || "Add"}
-                title={addOpen ? "Cancel" : cfg.addLabel || "Add"}
-                type="button"
-              >
-                {/* Mobile symbol */}
-                <span className="sm:hidden text-xl leading-none">
-                  {addOpen ? "×" : "+"}
-                </span>
-                {/* Desktop label */}
-                <span className="hidden sm:inline">
-                  {addOpen ? "Cancel" : cfg.addLabel || "Add"}
-                </span>
-              </button>
-            )}
-          </div>
-        ) : null}
+              <ListActions
+                activeList={activeList}
+                currentUserId={user.id}
+                onAfterDelete={async (deletedId) => {
+                  if (deletedId === activeListId) setActiveListId?.(null);
+                  lastRefreshAt.current = Date.now();
+                  await refreshLists?.();
+                }}
+                onAfterUnsubscribe={async (leftId) => {
+                  if (leftId === activeListId) setActiveListId?.(null);
+                  lastRefreshAt.current = Date.now();
+                  await refreshLists?.();
+                }}
+              />
+            </>
+          )}
+
+          {/* Add / Cancel button */}
+          {hasValidActive && cfg.supportsAdd && (
+            <button
+              onClick={() => setAddOpen((v) => !v)}
+              className={`rounded w-9 h-9 flex items-center justify-center font-bold text-xl leading-none border ${
+                addOpen
+                  ? "bg-gray-200 hover:bg-gray-300"
+                  : "bg-green-500 hover:bg-green-600 text-white"
+              }`}
+              aria-expanded={addOpen}
+              aria-label={addOpen ? "Cancel" : cfg.addLabel || "Add"}
+              title={addOpen ? "Cancel" : cfg.addLabel || "Add"}
+              type="button"
+            >
+              {addOpen ? "×" : "+"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Body */}
@@ -223,6 +240,11 @@ export default function Home() {
       ) : activeListType === "note" ? (
         <NoteEditor user={user} listId={activeListId} />
       ) : null}
+
+      <SearchDialog
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+      />
 
       <ManageListsDrawer
         open={manageOpen}
