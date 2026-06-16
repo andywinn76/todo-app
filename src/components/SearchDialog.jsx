@@ -191,7 +191,13 @@ export default function SearchDialog({ open, onClose }) {
                 <X className="w-4 h-4" />
               </button>
             )}
-            <kbd className="hidden sm:inline-flex items-center justify-center w-9 h-9 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded font-sans">
+            <kbd
+              role="button"
+              tabIndex={0}
+              onClick={onClose}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClose()}
+              className="hidden sm:inline-flex items-center justify-center w-9 h-9 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded font-sans cursor-pointer hover:bg-blue-100"
+            >
               Esc
             </kbd>
           </div>
