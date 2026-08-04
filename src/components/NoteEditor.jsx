@@ -221,6 +221,7 @@ export default function NoteEditor({ user, listId }) {
         .from("notes")
         .select("*")
         .eq("list_id", String(listId))
+        .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
