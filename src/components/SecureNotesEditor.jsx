@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { decryptText, encryptText } from "@/lib/crypto";
+import { readCachedSecureNote, writeCachedSecureNote } from "@/lib/offlineCache";
 
 export default function SecureNotesEditor({ user, listId }) {
   const [note, setNote] = useState(null); // encrypted row
@@ -14,6 +15,7 @@ export default function SecureNotesEditor({ user, listId }) {
   const [unlocking, setUnlocking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [usingCache, setUsingCache] = useState(false);
 
   const saveTimer = useRef(null);
 
@@ -21,6 +23,7 @@ export default function SecureNotesEditor({ user, listId }) {
     if (!user || !listId) return;
 
     setIsLoading(true);
+    setUsingCache(false);
 
     const { data, error } = await supabase
       .from("secure_notes")
@@ -30,6 +33,20 @@ export default function SecureNotesEditor({ user, listId }) {
       .maybeSingle();
 
     if (error) {
+      // Encrypted blob only — plaintext never touches the cache, so this is
+      // safe to fall back to while offline. Decryption still requires the
+      // master password, exactly as when reading from the server.
+      const cached = readCachedSecureNote(user.id, listId);
+      if (cached?.content_encrypted) {
+        console.error(error);
+        setNote(cached);
+        setBody("");
+        setLastSavedAt(cached.updated_at || null);
+        setUsingCache(true);
+        setIsLoading(false);
+        return;
+      }
+
       console.error(error);
       toast.error("Failed to load secure note");
       setNote(null);
@@ -39,6 +56,7 @@ export default function SecureNotesEditor({ user, listId }) {
       return;
     }
 
+    if (data) writeCachedSecureNote(user.id, listId, data);
     setNote(data);
     setBody("");
     setLastSavedAt(data?.updated_at || null);
@@ -123,6 +141,8 @@ export default function SecureNotesEditor({ user, listId }) {
         if (error) throw error;
         setNote(data);
         setLastSavedAt(data.updated_at);
+        setUsingCache(false);
+        writeCachedSecureNote(user.id, listId, data);
       } else {
         const { data, error } = await supabase
           .from("secure_notes")
@@ -142,6 +162,8 @@ export default function SecureNotesEditor({ user, listId }) {
         if (error) throw error;
         setNote(data);
         setLastSavedAt(data.updated_at);
+        setUsingCache(false);
+        writeCachedSecureNote(user.id, listId, data);
       }
 
       return true;
@@ -194,13 +216,20 @@ async function lockNow() {
 
   const subtitle = useMemo(() => {
     if (saving) return "Saving…";
+    if (usingCache) {
+      if (!lastSavedAt) return "Offline — no cached copy available yet";
+      const d = new Date(lastSavedAt);
+      return isNaN(d.getTime())
+        ? "Offline — showing last synced copy"
+        : `Offline — showing last synced copy from ${d.toLocaleString()}`;
+    }
     if (!lastSavedAt) return null;
 
     const d = new Date(lastSavedAt);
     if (isNaN(d.getTime())) return null;
 
     return `Last saved ${d.toLocaleString()}`;
-  }, [saving, lastSavedAt]);
+  }, [saving, usingCache, lastSavedAt]);
 
   if (isLoading) {
     return (
@@ -214,6 +243,11 @@ async function lockNow() {
     return (
       <section className="flex min-h-[50dvh] flex-col items-center justify-center gap-4">
         <h2 className="text-xl font-semibold">Secure Note Locked</h2>
+        {usingCache && (
+          <p className="text-xs text-amber-700">
+            Offline — showing the last synced copy. Your master password still works as usual.
+          </p>
+        )}
 
         <form
           onSubmit={handleUnlock}

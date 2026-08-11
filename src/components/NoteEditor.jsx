@@ -10,6 +10,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { Extension } from "@tiptap/core";
 import LinkExtension from "@tiptap/extension-link";
+import { readCachedNote, writeCachedNote } from "@/lib/offlineCache";
+import useOnlineStatus from "@/hooks/useOnlineStatus";
 import {
   Bold,
   Italic,
@@ -102,6 +104,11 @@ export default function NoteEditor({ user, listId }) {
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [linkInputActive, setLinkInputActive] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
+  const [usingCache, setUsingCache] = useState(false);
+  const [offlinePending, setOfflinePending] = useState(false);
+  const [conflict, setConflict] = useState(null); // { server } | null
+
+  const online = useOnlineStatus();
 
   // Keep note state in a ref so doSave never captures a stale closure
   const noteRef = useRef(null);
@@ -109,37 +116,69 @@ export default function NoteEditor({ user, listId }) {
   const textColorRef = useRef(null);
   const highlightColorRef = useRef(null);
   const linkInputRef = useRef(null);
+  // Version basis for the current edit session — used to detect whether the
+  // server changed out from under an offline edit.
+  const baselineUpdatedAtRef = useRef(null);
+  // True whenever the editor holds content not yet confirmed saved.
+  const dirtyRef = useRef(false);
+  const offlineToastShownRef = useRef(false);
+  const conflictRef = useRef(null);
+  const prevOnlineRef = useRef(online);
+
+  useEffect(() => {
+    conflictRef.current = conflict;
+  }, [conflict]);
 
   // ----- save ---------------------------------------------------------------
 
   const doSave = useCallback(
     async (html) => {
+      if (conflictRef.current) return; // don't push writes while a conflict is unresolved
       const currentNote = noteRef.current;
       setSaving(true);
       try {
+        let data, error;
         if (currentNote?.id) {
-          const { data, error } = await supabase
+          ({ data, error } = await supabase
             .from("notes")
             .update({ body: html, updated_by: user.id })
             .eq("id", currentNote.id)
             .select()
-            .single();
-          if (error) throw error;
-          noteRef.current = data;
-          setLastSavedAt(data.updated_at);
+            .single());
         } else {
-          const { data, error } = await supabase
+          ({ data, error } = await supabase
             .from("notes")
             .insert([{ list_id: listId, body: html, updated_by: user.id }])
             .select()
-            .single();
-          if (error) throw error;
-          noteRef.current = data;
-          setLastSavedAt(data.updated_at);
+            .single());
         }
+        if (error) throw error;
+        noteRef.current = data;
+        baselineUpdatedAtRef.current = data.updated_at;
+        dirtyRef.current = false;
+        offlineToastShownRef.current = false;
+        setLastSavedAt(data.updated_at);
+        setOfflinePending(false);
+        writeCachedNote(user.id, listId, data);
       } catch (e) {
-        console.error(e);
-        toast.error("Failed to save note");
+        // Keep the edit safe locally so it isn't lost, then surface status.
+        writeCachedNote(user.id, listId, noteRef.current, {
+          body: html,
+          since: new Date().toISOString(),
+        });
+        if (!navigator.onLine) {
+          // Expected while offline — every debounced retry would otherwise
+          // log a console.error and trip Next.js's dev error overlay.
+          console.warn("Save deferred — offline:", e);
+          setOfflinePending(true);
+          if (!offlineToastShownRef.current) {
+            toast("You're offline — this note is saved locally and will sync automatically.");
+            offlineToastShownRef.current = true;
+          }
+        } else {
+          console.error(e);
+          toast.error("Failed to save note");
+        }
       } finally {
         setSaving(false);
       }
@@ -204,6 +243,13 @@ export default function NoteEditor({ user, listId }) {
     },
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
+      dirtyRef.current = true;
+      // Persist the in-progress edit immediately so it survives a closed tab
+      // even if the debounced save below never reaches the server.
+      writeCachedNote(user.id, listId, noteRef.current, {
+        body: html,
+        since: new Date().toISOString(),
+      });
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => doSave(html), 700);
     },
@@ -215,8 +261,36 @@ export default function NoteEditor({ user, listId }) {
     if (!user || !listId || !editor) return;
 
     let cancelled = false;
+    dirtyRef.current = false;
+    offlineToastShownRef.current = false;
+    setConflict(null);
+    setUsingCache(false);
+    setOfflinePending(false);
 
-    async function loadNote() {
+    // Instant paint from the local cache so the note is readable immediately,
+    // regardless of connection speed — then reconcile with the server below.
+    const cached = readCachedNote(user.id, listId);
+    if (cached) {
+      const hasPending = cached.pendingBody != null;
+      const showBody = hasPending ? cached.pendingBody : cached.body;
+      noteRef.current = cached.id
+        ? { id: cached.id, list_id: cached.list_id, updated_at: cached.updated_at }
+        : null;
+      baselineUpdatedAtRef.current = cached.updated_at;
+      setLastSavedAt(cached.updated_at);
+      setUsingCache(true);
+      // false = don't emit onUpdate (avoids saving immediately on load)
+      editor.commands.setContent(prepareContent(showBody), false);
+
+      if (hasPending) {
+        dirtyRef.current = true;
+        setOfflinePending(true);
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(() => doSave(showBody), 300);
+      }
+    }
+
+    async function reconcile() {
       const { data, error } = await supabase
         .from("notes")
         .select("*")
@@ -228,26 +302,98 @@ export default function NoteEditor({ user, listId }) {
       if (cancelled) return;
 
       if (error) {
-        console.error(error);
-        toast.error("Failed to load note");
-        noteRef.current = null;
-        editor.commands.setContent("", false);
+        if (!cached) {
+          console.error(error);
+          toast.error("Failed to load note");
+          noteRef.current = null;
+          editor.commands.setContent("", false);
+        }
+        // else: keep showing the cached copy (usingCache stays true)
         return;
       }
 
-      noteRef.current = data ?? null;
-      setLastSavedAt(data?.updated_at ?? null);
-      // false = don't emit onUpdate (avoids saving immediately on load)
-      editor.commands.setContent(prepareContent(data?.body), false);
+      setUsingCache(false);
+
+      if (!dirtyRef.current) {
+        // No local edits in flight — just adopt the server's version.
+        noteRef.current = data ?? null;
+        baselineUpdatedAtRef.current = data?.updated_at ?? null;
+        setLastSavedAt(data?.updated_at ?? null);
+        editor.commands.setContent(prepareContent(data?.body), false);
+        if (data) writeCachedNote(user.id, listId, data);
+        return;
+      }
+
+      // There are local edits not yet confirmed by the server.
+      if (data && data.updated_at !== baselineUpdatedAtRef.current) {
+        setConflict({ server: data });
+      }
+      // else: server matches what we started from (or the note doesn't exist
+      // there yet) — no external change, let the normal save flow continue.
     }
 
-    loadNote();
+    reconcile();
 
     return () => {
       cancelled = true;
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [user, listId, editor]);
+  }, [user, listId, editor, doSave]);
+
+  // ----- resync when connection returns --------------------------------------
+
+  useEffect(() => {
+    const cameBackOnline = online && !prevOnlineRef.current;
+    prevOnlineRef.current = online;
+
+    if (!cameBackOnline || !user || !listId || !editor || !dirtyRef.current) {
+      return;
+    }
+
+    (async () => {
+      const { data, error } = await supabase
+        .from("notes")
+        .select("*")
+        .eq("list_id", String(listId))
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) return; // still unreachable — edit stays pending, retried on next reconnect
+
+      if (data && data.updated_at !== baselineUpdatedAtRef.current) {
+        setConflict({ server: data });
+      } else {
+        doSave(editor.getHTML());
+      }
+    })();
+  }, [online, user, listId, editor, doSave]);
+
+  // ----- conflict resolution --------------------------------------------------
+
+  function keepMyEdits() {
+    if (!conflict || !editor) return;
+    const { server } = conflict;
+    noteRef.current = server;
+    baselineUpdatedAtRef.current = server.updated_at;
+    setConflict(null);
+    // Use the editor's current content, not the snapshot taken when the
+    // conflict was detected, in case the user kept typing meanwhile.
+    doSave(editor.getHTML());
+  }
+
+  function loadLatestVersion() {
+    if (!conflict || !editor) return;
+    const { server } = conflict;
+    noteRef.current = server;
+    baselineUpdatedAtRef.current = server.updated_at;
+    dirtyRef.current = false;
+    setOfflinePending(false);
+    setLastSavedAt(server.updated_at);
+    writeCachedNote(user.id, listId, server);
+    editor.commands.setContent(prepareContent(server.body), false);
+    setConflict(null);
+  }
 
   // ----- manual save --------------------------------------------------------
 
@@ -261,11 +407,19 @@ export default function NoteEditor({ user, listId }) {
 
   const subtitle = useMemo(() => {
     if (saving) return "Saving…";
+    if (offlinePending) return "Offline — changes saved locally, will sync automatically";
+    if (usingCache) {
+      if (!lastSavedAt) return "Offline — no cached copy available yet";
+      const d = new Date(lastSavedAt);
+      return isNaN(d.getTime())
+        ? "Offline — showing last saved copy"
+        : `Offline — showing last saved copy from ${d.toLocaleString()}`;
+    }
     if (!lastSavedAt) return null;
     const d = new Date(lastSavedAt);
     if (isNaN(d.getTime())) return null;
     return `Last saved ${d.toLocaleString()}`;
-  }, [saving, lastSavedAt]);
+  }, [saving, offlinePending, usingCache, lastSavedAt]);
 
   const isReady = !!editor;
 
@@ -455,6 +609,31 @@ export default function NoteEditor({ user, listId }) {
         )}
 
         </div>{/* end sticky wrapper */}
+
+        {/* ── Sync conflict banner ── */}
+        {conflict && (
+          <div className="flex flex-col gap-2 border-b bg-amber-50 px-3 py-2 text-sm">
+            <span className="text-amber-800">
+              This note changed elsewhere while you were offline. Choose which version to keep.
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={keepMyEdits}
+                className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+              >
+                Keep my edits
+              </button>
+              <button
+                type="button"
+                onClick={loadLatestVersion}
+                className="rounded border px-3 py-1 hover:bg-gray-50"
+              >
+                Load latest version
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Editor content ── */}
         <div className="flex-1">

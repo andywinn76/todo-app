@@ -24,3 +24,11 @@ Replace refresh-triggered refetching with push-based updates so changes from one
 - Handle reconnect after network drop or tab sleep — refetch once on resubscribe so nothing missed while disconnected
 
 **Done when:** two browsers on the same shared list reflect each other's changes without a manual refresh, and a user without access receives nothing.
+
+## Offline notes cache — follow-ups
+
+Notes and Secure Notes now cache locally (`src/lib/offlineCache.js`) so they're readable instantly and edits queue up when offline, syncing (with a conflict warning) once reconnected. Deliberately out of scope for that pass, left here for later:
+
+- **Secure Notes offline editing**: currently read-only offline (cached ciphertext only, decrypts locally via the master password). Saving a secure note still requires a live connection — no pending-edit queue like regular Notes have.
+- **Todos / Groceries offline cache**: only Notes/Secure Notes are cached today. Extending the same pattern to todo and grocery lists would need a per-item (not per-list) cache shape.
+- **Realtime + offline cache overlap**: once Realtime updates (above) land, the offline cache's reconnect-reconciliation should be re-checked against live push updates so the two don't fight over which version is "current."
