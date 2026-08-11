@@ -27,9 +27,13 @@ self.addEventListener("activate", (event) => {
 
 function isStaticAsset(pathname) {
   return (
-    pathname.startsWith("/_next/static/") ||
+    pathname.startsWith("/_next/") || // includes /_next/static/ and the
+    // /_next/image optimizer endpoint next/image routes all <Image> src
+    // requests through (e.g. the header logo) — both are safe to cache
+    // since the same URL+params always produce the same output.
     pathname.startsWith("/icons/") ||
-    pathname === "/manifest.json"
+    pathname === "/manifest.json" ||
+    /\.(png|jpe?g|svg|ico|webp|gif)$/i.test(pathname)
   );
 }
 
