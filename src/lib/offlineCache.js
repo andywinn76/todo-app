@@ -5,6 +5,7 @@
 
 const noteKey = (userId, listId) => `noteCache:${userId}:${listId}`;
 const secureNoteKey = (userId, listId) => `secureNoteCache:${userId}:${listId}`;
+const listsKey = (userId) => `listsCache:${userId}`;
 
 function readJSON(key) {
   try {
@@ -57,4 +58,18 @@ export function writeCachedSecureNote(userId, listId, note) {
     crypto_version: note?.crypto_version ?? null,
     updated_at: note?.updated_at ?? null,
   });
+}
+
+// The enriched lists array built by ListsProvider.refreshLists() — cached
+// as-is so an offline mount can still resolve which list to show without a
+// round trip to Supabase.
+export function readCachedLists(userId) {
+  if (!userId) return null;
+  const cached = readJSON(listsKey(userId));
+  return Array.isArray(cached) ? cached : null;
+}
+
+export function writeCachedLists(userId, lists) {
+  if (!userId || !Array.isArray(lists)) return;
+  writeJSON(listsKey(userId), lists);
 }

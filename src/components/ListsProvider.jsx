@@ -10,6 +10,7 @@ import {
 } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/components/AuthProvider";
+import { readCachedLists, writeCachedLists } from "@/lib/offlineCache";
 
 const STORAGE_KEY = (userId) => `lastListId:${userId ?? "anon"}`;
 const ListsContext = createContext();
@@ -53,6 +54,17 @@ export function ListsProvider({ children }) {
         return [];
       }
 
+      // Selection policy shared by the online and offline-fallback paths:
+      // - If something is already selected, leave it.
+      // - Otherwise, prefer saved (if it still exists), else the first list.
+      const applySelection = (list) => {
+        if (activeListId == null && list.length) {
+          const saved = storageKey ? localStorage.getItem(storageKey) : null;
+          const exists = saved && list.some((l) => String(l.id) === String(saved));
+          selectList(exists ? saved : list[0].id);
+        }
+      };
+
       // Pull role via list_members, and the nested lists *including type*.
       const { data, error } = await supabase
         .from("list_members")
@@ -65,6 +77,14 @@ export function ListsProvider({ children }) {
 
       if (error) {
         console.error("load my lists error:", error.message, error.details);
+        // Likely offline — fall back to the last successfully fetched lists
+        // so the active list (and therefore its cached note) can still resolve.
+        const cached = readCachedLists(user.id);
+        if (cached && cached.length) {
+          setLists(cached);
+          applySelection(cached);
+          return cached;
+        }
         setLists([]);
         return [];
       }
@@ -97,16 +117,8 @@ export function ListsProvider({ children }) {
       });
 
       setLists(enriched);
-
-      // Selection policy:
-      // - If something is already selected, leave it.
-      // - Otherwise, prefer saved (if it still exists), else fall back to the first list.
-      if (activeListId == null && enriched.length) {
-        const saved = storageKey ? localStorage.getItem(storageKey) : null;
-        const exists =
-          saved && enriched.some((l) => String(l.id) === String(saved));
-        selectList(exists ? saved : enriched[0].id);
-      }
+      writeCachedLists(user.id, enriched);
+      applySelection(enriched);
 
       return enriched;
     },

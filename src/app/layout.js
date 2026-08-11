@@ -5,6 +5,7 @@ import { ListsProvider } from "@/components/ListsProvider";
 import { Suspense } from "react";
 import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/next";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 export const metadata = {
   title: "Lets Doooo It",
@@ -25,6 +26,7 @@ export default function RootLayout({ children }) {
               <ConditionalHeader />
               {children}
               <Analytics />
+              <ServiceWorkerRegister />
               <Toaster
                 position="top-center"
                 toastOptions={{
