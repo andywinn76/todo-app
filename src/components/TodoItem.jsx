@@ -12,6 +12,7 @@ function TodoItem({
   onUpdate,
   onEdit,
   onDragStart,
+  reorderEnabled = true,
   dragging = false,
   busy = false,
 }) {
@@ -46,10 +47,11 @@ function TodoItem({
     >
       <button
         type="button"
-        className="mt-0.5 -ml-1 flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+        className="mt-0.5 -ml-1 flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
         onPointerDown={(event) => onDragStart?.(event, todo.id)}
+        disabled={!reorderEnabled}
         aria-label={`Reorder ${todo.title}`}
-        title="Drag to reorder"
+        title={reorderEnabled ? "Drag to reorder" : "Choose Custom order to drag items"}
       >
         <FaGripVertical className="size-4" aria-hidden="true" />
       </button>

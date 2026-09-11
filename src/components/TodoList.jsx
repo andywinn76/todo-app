@@ -18,6 +18,7 @@ export default function TodoList({ lastCreated }) {
 
   const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [sortOrder, setSortOrder] = useState("custom");
   const [draggingId, setDraggingId] = useState(null);
   const dragRef = useRef(null);
 
@@ -68,6 +69,10 @@ export default function TodoList({ lastCreated }) {
     return () => {
       cancelled = true;
     };
+  }, [activeListId]);
+
+  useEffect(() => {
+    setSortOrder("custom");
   }, [activeListId]);
 
   // ------------------------------------------------------------
@@ -288,6 +293,18 @@ export default function TodoList({ lastCreated }) {
     [loading, todos.length]
   );
 
+  const displayedTodos = useMemo(() => {
+    if (sortOrder === "custom") return todos;
+
+    return [...todos].sort((a, b) => {
+      const comparison = (a.title || "").localeCompare(b.title || "", undefined, {
+        sensitivity: "base",
+        numeric: true,
+      });
+      return sortOrder === "az" ? comparison : -comparison;
+    });
+  }, [sortOrder, todos]);
+
   if (!activeListId) {
     return (
       <p className="mt-6 text-gray-600 text-center">
@@ -303,21 +320,40 @@ export default function TodoList({ lastCreated }) {
       ) : isEmpty ? (
         <p className="text-gray-700 text-2xl">No items.</p>
       ) : (
-        <ul className="space-y-2">
-          {todos.map((todo) => (
-            <TodoItem
-              key={todo.id}
-              todo={todo}
-              busy={busyIds.has(todo.id)}
-              dragging={draggingId === todo.id}
-              onToggle={(next) => handleToggle(todo.id, next)}
-              onUpdate={(partial) => handleUpdate(todo.id, partial)}
-              onDelete={() => handleDelete(todo.id)}
-              onEdit={openEdit}
-              onDragStart={handleDragStart}
-            />
-          ))}
-        </ul>
+        <>
+          <div className="mb-2 flex justify-end">
+            <label className="flex items-center gap-2 text-sm text-gray-600">
+              <span>Sort</span>
+              <select
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value)}
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                aria-label="Sort todo items"
+              >
+                <option value="custom">Custom order</option>
+                <option value="az">A–Z</option>
+                <option value="za">Z–A</option>
+              </select>
+            </label>
+          </div>
+
+          <ul className="space-y-2">
+            {displayedTodos.map((todo) => (
+              <TodoItem
+                key={todo.id}
+                todo={todo}
+                busy={busyIds.has(todo.id)}
+                dragging={draggingId === todo.id}
+                reorderEnabled={sortOrder === "custom"}
+                onToggle={(next) => handleToggle(todo.id, next)}
+                onUpdate={(partial) => handleUpdate(todo.id, partial)}
+                onDelete={() => handleDelete(todo.id)}
+                onEdit={openEdit}
+                onDragStart={handleDragStart}
+              />
+            ))}
+          </ul>
+        </>
       )}
 
       {/* --------------------------------------------------------
