@@ -8,7 +8,7 @@ export async function fetchTodos(listId) {
     .from("todos")
     .select("*")
     .eq("list_id", String(listId))
-    .order("due_date", { ascending: true })
+    .order("position", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   return { data: data ?? [], error };
@@ -123,4 +123,16 @@ export async function updateTodo(id, updates) {
 export async function deleteTodo(id) {
   const { data, error } = await supabase.from("todos").delete().eq("id", id);
   return { data, error };
+}
+
+// Persist the complete visible order after a drag. Updating every row keeps the
+// positions compact and makes later inserts/reorders predictable.
+export async function reorderTodos(todos) {
+  const results = await Promise.all(
+    todos.map((todo, position) =>
+      supabase.from("todos").update({ position }).eq("id", todo.id)
+    )
+  );
+
+  return { error: results.find((result) => result.error)?.error ?? null };
 }

@@ -2,10 +2,19 @@
 
 import { memo, useMemo, useCallback } from "react";
 import { format } from "date-fns";
-import { FaPencilAlt } from "react-icons/fa";
+import { FaGripVertical, FaPencilAlt } from "react-icons/fa";
 import DeleteIconButton from "./DeleteIconButton";
 
-function TodoItem({ todo, onToggle, onDelete, onUpdate, onEdit, busy = false }) {
+function TodoItem({
+  todo,
+  onToggle,
+  onDelete,
+  onUpdate,
+  onEdit,
+  onDragStart,
+  dragging = false,
+  busy = false,
+}) {
   const progressColor = useMemo(() => {
     if (todo.progress == null) return null;
     const h = Math.min(120, Math.max(0, todo.progress * 1.2));
@@ -28,10 +37,23 @@ function TodoItem({ todo, onToggle, onDelete, onUpdate, onEdit, busy = false }) 
 
   return (
     <li
-      className={`flex items-start gap-2 border-b-1 border-slate-300 bg-white p-2 shadow-sm ${
-        todo.completed ? "opacity-60" : ""
+      data-todo-id={todo.id}
+      className={`flex items-start gap-2 border-b-1 border-slate-300 bg-white p-2 shadow-sm transition ${
+        dragging ? "relative z-10 scale-[1.01] bg-blue-50 shadow-md ring-2 ring-blue-400" : ""
+      } ${
+        todo.completed && !dragging ? "opacity-60" : ""
       }`}
     >
+      <button
+        type="button"
+        className="mt-0.5 -ml-1 flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+        onPointerDown={(event) => onDragStart?.(event, todo.id)}
+        aria-label={`Reorder ${todo.title}`}
+        title="Drag to reorder"
+      >
+        <FaGripVertical className="size-4" aria-hidden="true" />
+      </button>
+
       <input
         type="checkbox"
         className="mt-1 size-4"

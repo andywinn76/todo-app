@@ -10,6 +10,7 @@ import {
   fetchTodos as apiFetchTodos,
   updateTodo as apiUpdateTodo,
   deleteTodo as apiDeleteTodo,
+  reorderTodos as apiReorderTodos,
 } from "@/lib/todos";
 
 export default function TodoList({ lastCreated }) {
@@ -17,6 +18,8 @@ export default function TodoList({ lastCreated }) {
 
   const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [draggingId, setDraggingId] = useState(null);
+  const dragRef = useRef(null);
 
   // Track in-flight operations per-todo
   const [busyIds, setBusyIds] = useState(() => new Set());
@@ -220,6 +223,63 @@ export default function TodoList({ lastCreated }) {
     [activeListId, setBusyFor]
   );
 
+  const handleDragStart = useCallback((event, id) => {
+    if (event.button !== 0 || busyIds.has(id)) return;
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = { id, original: todos, latest: todos };
+    setDraggingId(id);
+
+    const handleMove = (moveEvent) => {
+      const edgeSize = 80;
+      if (moveEvent.clientY < edgeSize) {
+        window.scrollBy({ top: -12, behavior: "auto" });
+      } else if (moveEvent.clientY > window.innerHeight - edgeSize) {
+        window.scrollBy({ top: 12, behavior: "auto" });
+      }
+
+      const target = document
+        .elementFromPoint(moveEvent.clientX, moveEvent.clientY)
+        ?.closest("[data-todo-id]");
+      const targetId = target?.dataset.todoId;
+      if (!targetId || targetId === dragRef.current?.id) return;
+
+      setTodos((current) => {
+        const from = current.findIndex((todo) => String(todo.id) === String(id));
+        const to = current.findIndex((todo) => String(todo.id) === targetId);
+        if (from < 0 || to < 0 || from === to) return current;
+        const next = current.slice();
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        dragRef.current.latest = next;
+        return next;
+      });
+    };
+
+    const handleEnd = async () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleEnd);
+      window.removeEventListener("pointercancel", handleEnd);
+
+      const drag = dragRef.current;
+      dragRef.current = null;
+      setDraggingId(null);
+      if (!drag || drag.latest === drag.original) return;
+
+      const { error } = await apiReorderTodos(drag.latest);
+      if (error) {
+        console.error("Error saving todo order:", error);
+        setTodos(drag.original);
+        toast.error("Couldn’t save the new order.");
+      }
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleEnd, { once: true });
+    window.addEventListener("pointercancel", handleEnd, { once: true });
+  }, [busyIds, todos]);
+
   // ------------------------------------------------------------
   // 6. EMPTY STATE / RENDER
   // ------------------------------------------------------------
@@ -249,10 +309,12 @@ export default function TodoList({ lastCreated }) {
               key={todo.id}
               todo={todo}
               busy={busyIds.has(todo.id)}
+              dragging={draggingId === todo.id}
               onToggle={(next) => handleToggle(todo.id, next)}
               onUpdate={(partial) => handleUpdate(todo.id, partial)}
               onDelete={() => handleDelete(todo.id)}
               onEdit={openEdit}
+              onDragStart={handleDragStart}
             />
           ))}
         </ul>
