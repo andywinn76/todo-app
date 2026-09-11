@@ -353,6 +353,10 @@ export default function TodoList({ lastCreated }) {
               />
             ))}
           </ul>
+
+          <p className="mt-3 border-t border-gray-200 pt-2 text-right text-base font-bold text-gray-500">
+            Total items: {todos.length}
+          </p>
         </>
       )}
 
