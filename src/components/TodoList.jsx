@@ -321,13 +321,14 @@ export default function TodoList({ lastCreated }) {
         <p className="text-gray-700 text-2xl">No items.</p>
       ) : (
         <>
-          <div className="mb-2 flex justify-end">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-stone-500">{todos.filter((todo) => !todo.completed).length} remaining</p>
             <label className="flex items-center gap-2 text-sm text-gray-600">
-              <span>Sort</span>
+              <span className="text-stone-500">Sort by</span>
               <select
                 value={sortOrder}
                 onChange={(event) => setSortOrder(event.target.value)}
-                className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                className="app-select"
                 aria-label="Sort todo items"
               >
                 <option value="custom">Custom order</option>
@@ -337,7 +338,7 @@ export default function TodoList({ lastCreated }) {
             </label>
           </div>
 
-          <ul className="space-y-2">
+          <ul className="todo-list-surface">
             {displayedTodos.map((todo) => (
               <TodoItem
                 key={todo.id}
@@ -354,8 +355,8 @@ export default function TodoList({ lastCreated }) {
             ))}
           </ul>
 
-          <p className="mt-3 border-t border-gray-200 pt-2 text-right text-base font-bold text-gray-500">
-            Total items: {todos.length}
+          <p className="mt-3 text-right text-sm font-medium text-stone-500">
+            {todos.length} total items
           </p>
         </>
       )}

@@ -22,14 +22,14 @@ export default function ListTitleSwitcher({
       <button
         ref={btnRef}
         type="button"
-        className="inline-flex max-w-full items-center gap-2 text-2xl font-bold leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="inline-flex max-w-full items-center gap-3 text-[1.65rem] font-semibold tracking-tight leading-tight text-stone-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
         aria-haspopup="dialog"
         aria-expanded={false}
         onClick={() => onOpenManage?.()}
         title="Manage lists"
       >
-        <FaChevronDown className="ml-1 shrink-0" />
         <span className="truncate">{activeName}</span>
+        <FaChevronDown className="shrink-0 text-xs text-stone-400" />
       </button>
     </div>
   );

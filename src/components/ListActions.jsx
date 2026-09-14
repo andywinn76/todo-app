@@ -40,9 +40,9 @@ export default function ListActions({
   })();
 
   const btnIcon =
-    "inline-flex items-center justify-center rounded p-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed";
-  const danger = "hover:bg-red-100 text-red-600";
-  const warn = "hover:bg-amber-100 text-amber-700";
+    "app-icon-button disabled:opacity-50 disabled:cursor-not-allowed";
+  const danger = "hover:!bg-rose-50 hover:!text-rose-700";
+  const warn = "hover:!bg-amber-50 hover:!text-amber-700";
 
   async function handleDelete() {
     if (!window.confirm(`Delete “${activeList.name}”? This cannot be undone.`))
@@ -96,7 +96,7 @@ export default function ListActions({
           className={`${btnIcon} ${danger}`}
           title="Delete list"
         >
-          <FaTrashAlt className="w-5 h-5" />
+          <FaTrashAlt className="size-4" />
         </button>
       ) : (
         <button
@@ -106,7 +106,7 @@ export default function ListActions({
           className={`${btnIcon} ${warn}`}
           title="Leave this list"
         >
-          <FaUserMinus className="w-5 h-5" />
+          <FaUserMinus className="size-4" />
           {/* <span className="hidden sm:inline">Unsubscribe</span> */}
         </button>
       )}

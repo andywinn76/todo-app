@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f6f3;
+  --surface: #fffefa;
+  --foreground: #252a27;
+  --accent: #147a67;
+  --accent-hover: #0e6455;
 }
 
 @theme inline {
@@ -12,17 +15,89 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.app-shell {
+  min-height: 100dvh;
+  background: var(--surface);
+  box-shadow: 0 12px 45px rgb(39 49 44 / 5%);
+}
+
+.app-header {
+  background: var(--surface);
+  border-bottom: 1px solid #e9e8e2;
+}
+
+.app-icon-button {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: .55rem;
+  color: #68716b;
+  transition: background .15s, color .15s;
+}
+.app-icon-button:hover { background: #f0f1ed; color: #25342f; }
+.app-icon-button:focus-visible,
+.app-select:focus-visible,
+.app-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.app-select, .app-input {
+  border: 1px solid #dcded7;
+  border-radius: .6rem;
+  background: white;
+  color: #35413a;
+}
+.app-select { padding: .42rem .7rem; font-size: .875rem; }
+.app-input::placeholder { color: #9a9f98; }
+.list-filter-icon { left: .85rem; }
+.list-filter-input { padding-left: 2.65rem; }
+
+.todo-list-surface {
+  border: 1px solid #e8e9e3;
+  border-radius: .9rem;
+  background: white;
+}
+.todo-row {
+  padding: .85rem .9rem;
+  border-bottom: 1px solid #eceee8;
+  background: white;
+}
+.todo-row:first-child { border-radius: .9rem .9rem 0 0; }
+.todo-row:last-child { border-bottom: 0; border-radius: 0 0 .9rem .9rem; }
+.todo-row:only-child { border-radius: .9rem; }
+.todo-row:hover { background: #fafbf8; }
+.todo-row-menu-trigger { opacity: .45; }
+.todo-row:hover .todo-row-menu-trigger,
+.todo-row:focus-within .todo-row-menu-trigger { opacity: 1; }
+.grocery-delete-button { color: #a98282; }
+.grocery-delete-button:hover { color: #9e4343; background: #fbefef; }
+
+.drawer-list-row { border: 1px solid transparent; }
+.drawer-list-row:hover { background: #f4f5f1; }
+.drawer-list-row-current { background: #edf3ef; border-color: #d8e6dc; }
+.drawer-list-actions > button { color: #50ce5b; }
+.drawer-list-actions > .relative > .app-icon-button { color: #41749b; }
+.drawer-list-actions > .flex > button { color: #b17272; }
+.drawer-list-actions > button:hover { background: #edf4f0; color: #1f9c30; }
+.drawer-list-actions > .relative > .app-icon-button:hover { background: #eef3f6; color: #1e81cc; }
+.drawer-list-actions > .flex > button:hover { background: #fbefef; color: #9e4343; }
+.list-header-actions > button.app-icon-button { color: #50ce5b; }
+.list-header-actions > .relative > .app-icon-button { color: #41749b; }
+.list-header-actions > .flex > button { color: #b17272; }
+.list-header-actions > button.app-icon-button:hover { background: #edf4f0; color: #1f9c30; }
+.list-header-actions > .relative > .app-icon-button:hover { background: #eef3f6; color: #1e81cc; }
+.list-header-actions > .flex > button:hover { background: #fbefef; color: #9e4343; }
+
+@media (hover: none) {
+  .todo-row-menu-trigger { opacity: 1; }
 }
 
 /* ── Tiptap / ProseMirror editor prose styles ── */

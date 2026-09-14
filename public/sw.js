@@ -43,6 +43,8 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // Next.js development reuses asset URLs, so cached bundles can hide local edits.
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return;
   if (url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {

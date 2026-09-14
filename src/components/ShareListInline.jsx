@@ -66,14 +66,14 @@ export default function ShareListInline({
   const Trigger = (
     <button
       type="button"
-      className="inline-flex items-center justify-center rounded p-1.5 hover:bg-gray-100"
+      className="app-icon-button"
       onClick={() => setOpen(!open)}
       aria-expanded={open}
       aria-controls={`share-form-${listId}`}
       aria-label="Invite user to this list"
       title="Invite user"
     >
-      <FaShareAlt className="text-blue-600 w-5 h-5" />
+      <FaShareAlt className="size-4" />
     </button>
   );
 

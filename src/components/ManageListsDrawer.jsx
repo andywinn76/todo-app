@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import ShareListInline from "@/components/ShareListInline";
-import { FaPencilAlt } from "react-icons/fa";
+import { FaGripVertical, FaPencilAlt } from "react-icons/fa";
 import ListActions from "@/components/ListActions";
 import { useLists } from "@/components/ListsProvider";
 import ListTypeBadge from "@/components/ListTypeBadge";
@@ -14,14 +14,14 @@ import { Search } from "lucide-react";
 function TypePicker({ value, onChange, disabled, id = "drawer-list-type" }) {
   return (
     <>
-      <label className="block text-sm font-semibold mb-1" htmlFor={id}>
+      <label className="mb-1.5 block text-sm font-medium text-stone-700" htmlFor={id}>
         List type
       </label>
       <select
         id={id}
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
-        className="w-full border rounded px-3 py-2 mb-3"
+        className="app-select mb-3 w-full"
         disabled={disabled}
       >
         <option value="todo">Todo</option>
@@ -41,6 +41,7 @@ export default function ManageListsDrawer({
   onAfterDelete, // async (deletedListId) => void
   onAfterCreate, // async (createdList) => void
   onAfterRename,
+  onOpenSearch,
   triggerRef, // ref to the "Manage" button (for focus return)
 }) {
   const { activeListId, setActiveListId } = useLists(); // UUID strings
@@ -64,6 +65,13 @@ export default function ManageListsDrawer({
 
   // List filter / search
   const [filterQuery, setFilterQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState("custom");
+  const [orderedIds, setOrderedIds] = useState([]);
+  const [databaseOrderAvailable, setDatabaseOrderAvailable] = useState(false);
+  const [draggingId, setDraggingId] = useState(null);
+  const dragRef = useRef(null);
+  const listScrollRef = useRef(null);
+  const orderKey = user ? `list-order:${user.id}` : null;
 
   //Renaming lists state
   const [renamingId, setRenamingId] = useState(null);
@@ -154,6 +162,137 @@ export default function ManageListsDrawer({
     setOptimisticNames({});
     setFilterQuery("");
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !orderKey || !user?.id || !lists.length) return;
+    let cancelled = false;
+    let localIds = [];
+    try {
+      const saved = JSON.parse(localStorage.getItem(orderKey) || "[]");
+      localIds = Array.isArray(saved) ? saved.map(String) : [];
+    } catch {}
+    setOrderedIds(localIds);
+    setDatabaseOrderAvailable(false);
+
+    async function loadOrder() {
+      const { data, error } = await supabase
+        .from("list_members")
+        .select("list_id, position")
+        .eq("user_id", user.id);
+      if (cancelled || error) return; // Browser order remains available until migration.
+      setDatabaseOrderAvailable(true);
+
+      const savedRows = (data || [])
+        .filter((row) => Number.isInteger(row.position))
+        .sort((a, b) => a.position - b.position);
+      if (savedRows.length) {
+        setOrderedIds(savedRows.map((row) => String(row.list_id)));
+        return;
+      }
+
+      // Carry an existing browser order into the database once, when no
+      // database order has been saved yet for this member.
+      if (localIds.length) {
+        const knownIds = new Set(lists.map((list) => String(list.id)));
+        const imported = [...new Set(localIds.filter((id) => knownIds.has(id)))];
+        for (const list of lists) {
+          if (!imported.includes(String(list.id))) imported.push(String(list.id));
+        }
+        const { error: importError } = await supabase.rpc("reorder_my_lists", {
+          ordered_list_ids: imported,
+        });
+        if (!cancelled) {
+          if (importError) setDatabaseOrderAvailable(false);
+          else setOrderedIds(imported);
+        }
+      }
+    }
+
+    loadOrder();
+    return () => { cancelled = true; };
+  }, [open, orderKey, user?.id, lists]);
+
+  const displayedLists = useMemo(() => {
+    const query = filterQuery.trim().toLocaleLowerCase();
+    const filtered = lists.filter((list) =>
+      !query || (list.name || "").toLocaleLowerCase().includes(query)
+    );
+    if (sortOrder !== "custom") {
+      return filtered.sort((a, b) => {
+        const comparison = (optimisticNames[a.id] ?? a.name ?? "").localeCompare(
+          optimisticNames[b.id] ?? b.name ?? "", undefined,
+          { sensitivity: "base", numeric: true }
+        );
+        return sortOrder === "az" ? comparison : -comparison;
+      });
+    }
+    const positions = new Map(orderedIds.map((id, index) => [id, index]));
+    return filtered.sort((a, b) =>
+      (positions.get(String(a.id)) ?? Infinity) - (positions.get(String(b.id)) ?? Infinity)
+    );
+  }, [filterQuery, lists, optimisticNames, orderedIds, sortOrder]);
+
+  function handleDragStart(event, id) {
+    if (event.button !== 0 || sortOrder !== "custom" || filterQuery.trim()) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const original = displayedLists.map((list) => String(list.id));
+    dragRef.current = { id: String(id), original, latest: original };
+    setDraggingId(id);
+
+    const handleMove = (moveEvent) => {
+      const scroll = listScrollRef.current;
+      if (scroll) {
+        const bounds = scroll.getBoundingClientRect();
+        if (moveEvent.clientY < bounds.top + 45) scroll.scrollTop -= 12;
+        else if (moveEvent.clientY > bounds.bottom - 45) scroll.scrollTop += 12;
+      }
+      const targetId = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)
+        ?.closest("[data-drawer-list-id]")?.dataset.drawerListId;
+      const drag = dragRef.current;
+      if (!drag || !targetId || targetId === drag.id) return;
+      const next = drag.latest.slice();
+      const from = next.indexOf(drag.id);
+      const to = next.indexOf(targetId);
+      if (from < 0 || to < 0 || from === to) return;
+      next.splice(from, 1);
+      next.splice(to, 0, drag.id);
+      drag.latest = next;
+      setOrderedIds(next);
+    };
+
+    const handleEnd = async () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleEnd);
+      window.removeEventListener("pointercancel", handleEnd);
+      const drag = dragRef.current;
+      dragRef.current = null;
+      setDraggingId(null);
+      if (!drag || drag.latest.join() === drag.original.join()) return;
+      if (databaseOrderAvailable) {
+        const { error } = await supabase.rpc("reorder_my_lists", {
+          ordered_list_ids: drag.latest,
+        });
+        if (error) {
+          console.error("Error saving list order:", error);
+          setOrderedIds(drag.original);
+          toast.error("Couldn’t save the new list order.");
+          return;
+        }
+      }
+      try {
+        localStorage.setItem(orderKey, JSON.stringify(drag.latest));
+      } catch {
+        if (!databaseOrderAvailable) {
+          setOrderedIds(drag.original);
+          toast.error("Couldn’t save the new list order.");
+        }
+      }
+    };
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleEnd, { once: true });
+    window.addEventListener("pointercancel", handleEnd, { once: true });
+  }
 
   function handleClose() {
     onClose?.();
@@ -262,16 +401,16 @@ export default function ManageListsDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="manage-lists-title"
-        className={`fixed inset-y-0 left-0 z-50 w-full max-w-[420px] bg-white shadow-2xl p-4 outline-none
+        className={`fixed inset-y-0 left-0 z-50 w-full max-w-[420px] bg-[var(--surface)] shadow-2xl p-5 outline-none
           flex flex-col h-dvh transform transition-transform duration-300 ease-out ${
             open ? "translate-x-0" : "-translate-x-full"
           }`}
         tabIndex={-1}
       >
-        <div className="flex items-baseline justify-between mb-3">
+        <div className="mb-5 flex items-center justify-between">
           <h2
             id="manage-lists-title"
-            className="text-lg font-semibold"
+            className="text-xl font-semibold tracking-tight text-stone-900"
             ref={focusStartRef}
             tabIndex={-1}
           >
@@ -284,7 +423,7 @@ export default function ManageListsDrawer({
                 type="button"
                 onClick={() => setShowCreateForm(true)}
                 disabled={busy || creating}
-                className="rounded w-9 h-9 flex items-center justify-center font-bold text-xl leading-none border bg-green-500 hover:bg-green-600 text-white"
+                className="flex size-9 items-center justify-center rounded-lg bg-[var(--accent)] text-xl font-medium leading-none text-white hover:bg-[var(--accent-hover)]"
                 aria-controls="create-list-form"
                 aria-label="Add new list"
               >
@@ -295,7 +434,7 @@ export default function ManageListsDrawer({
             <button
               onClick={handleClose}
               disabled={busy || creating}
-              className="rounded w-9 h-9 flex items-center justify-center font-bold text-xl leading-none border bg-white hover:bg-gray-100 text-gray-800"
+              className="app-icon-button text-xl"
               aria-label="Close manage lists"
             >
               ×
@@ -304,33 +443,48 @@ export default function ManageListsDrawer({
         </div>
 
         {/* Search / filter */}
-        <div className="relative mb-3">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <div className="relative mb-5">
+          <Search className="list-filter-icon pointer-events-none absolute top-1/2 size-4 -translate-y-1/2 text-stone-400" aria-hidden="true" />
           <input
             type="text"
             value={filterQuery}
             onChange={(e) => setFilterQuery(e.target.value)}
             placeholder="Filter lists…"
-            className="w-full border rounded pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="app-input list-filter-input w-full pr-3 py-2.5 text-sm"
           />
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            onClose?.();
+            onOpenSearch?.();
+          }}
+          className="mb-5 flex w-full items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-[var(--accent)] transition hover:border-[#c7d8cd] hover:bg-[#f5f9f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+        >
+          <Search className="size-4 shrink-0" aria-hidden="true" />
+          Search all items
+          <span className="ml-auto text-xs font-normal text-stone-400">Ctrl/⌘ K</span>
+        </button>
 
         {/* Form to create a new list */}
         {showCreateForm && (
           <form
             id="create-list-form"
             onSubmit={handleCreate}
-            className="rounded border bg-white p-3 shadow-sm mb-3"
+            className="mb-5 rounded-xl border border-[#dfe8df] bg-[#f8faf7] p-4"
           >
-            <label className="block text-sm font-semibold mb-1">
+            <h3 className="mb-4 text-base font-semibold text-stone-900">Create a list</h3>
+            <label className="mb-1.5 block text-sm font-medium text-stone-700" htmlFor="new-list-name">
               New list name
             </label>
             <input
+              id="new-list-name"
               ref={createInputRef}
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="w-full border rounded px-3 py-2 mb-3"
+              className="app-input mb-4 w-full px-3 py-2.5 text-sm"
               placeholder="e.g., Groceries, Trip Planning"
               disabled={creating}
             />
@@ -341,13 +495,13 @@ export default function ManageListsDrawer({
               disabled={creating}
             />
 
-            <div className="flex gap-2">
+            <div className="mt-4 flex gap-2">
               <button
                 type="submit"
                 disabled={creating || !newName.trim()}
                 className={`${
                   creating ? "opacity-75 cursor-not-allowed" : ""
-                } bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded`}
+                } rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70`}
               >
                 {creating ? "Creating…" : "Create List"}
               </button>
@@ -359,7 +513,7 @@ export default function ManageListsDrawer({
                   setShowCreateForm(false);
                 }}
                 disabled={creating}
-                className="border px-3 py-2 rounded hover:bg-gray-50"
+                className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
               >
                 Cancel
               </button>
@@ -367,29 +521,38 @@ export default function ManageListsDrawer({
           </form>
         )}
 
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span className="text-sm font-medium text-stone-500">{lists.length} lists</span>
+          <label className="flex items-center gap-2 text-sm text-stone-500">
+            <span>Sort by</span>
+            <select
+              value={sortOrder}
+              onChange={(event) => setSortOrder(event.target.value)}
+              className="app-select"
+              aria-label="Sort lists"
+            >
+              <option value="custom">Custom order</option>
+              <option value="az">A–Z</option>
+              <option value="za">Z–A</option>
+            </select>
+          </label>
+        </div>
+
         {/* Existing lists */}
-        <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 pb-2">
+        <div ref={listScrollRef} className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 pb-2">
           {lists.length === 0 && (
             <p className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
               No lists found.
             </p>
           )}
 
-          {lists.length > 0 && filterQuery.trim() &&
-            lists.filter((l) =>
-              (l.name || "").toLowerCase().includes(filterQuery.toLowerCase())
-            ).length === 0 && (
+          {lists.length > 0 && filterQuery.trim() && displayedLists.length === 0 && (
             <p className="text-sm text-gray-500 px-1 py-2">
               No lists match &ldquo;{filterQuery}&rdquo;
             </p>
           )}
 
-          {lists
-            .filter((l) =>
-              !filterQuery.trim() ||
-              (l.name || "").toLowerCase().includes(filterQuery.toLowerCase())
-            )
-            .map((list) => {
+          {displayedLists.map((list) => {
             const inviting = shareOpenId === list.id;
             const canInvite = isOwner(list);
             const isCurrent = list.id === activeListId;
@@ -397,18 +560,29 @@ export default function ManageListsDrawer({
             return (
               <div
                 key={list.id}
-                className={`rounded border pl-1 pr-3 py-1 ${
+                data-drawer-list-id={list.id}
+                className={`drawer-list-row rounded-xl px-2 py-1 ${
                   isCurrent
-                    ? "border-green-400"
-                    : "border-gray-400"
-                }`}
+                    ? "drawer-list-row-current"
+                    : ""
+                } ${draggingId === list.id ? "relative z-10 shadow-md ring-2 ring-[var(--accent)]" : ""}`}
               >
                 {/* Row header */}
-                <div className="flex items-center justify-between mb-3 sticky top-0 bg-white z-10 pt-1">
+                <div className="flex items-center justify-between gap-1">
+                  <button
+                    type="button"
+                    onPointerDown={(event) => handleDragStart(event, list.id)}
+                    disabled={sortOrder !== "custom" || !!filterQuery.trim()}
+                    className="-ml-1 flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded text-stone-400 hover:bg-stone-100 hover:text-stone-700 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
+                    aria-label={`Reorder ${list.name}`}
+                    title={sortOrder !== "custom" ? "Choose Custom order to drag lists" : filterQuery.trim() ? "Clear the filter to drag lists" : "Drag to reorder"}
+                  >
+                    <FaGripVertical className="size-4" aria-hidden="true" />
+                  </button>
                   {/* SELECT BUTTON (left column) */}
                   <button
                     type="button"
-                    className="min-w-0 flex-1 text-left rounded px-2 py-1 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    className="min-w-0 flex-1 rounded-lg px-2 py-2 text-left hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                     title="Select this list"
                     onClick={() => {
                       setActiveListId(list.id); // UUID string
@@ -421,8 +595,8 @@ export default function ManageListsDrawer({
                     >
                       {(optimisticNames[list.id] ?? list.name) || "Untitled"}
                       {isCurrent && (
-                        <span className="ml-2 text-xs text-blue-600">
-                          (current)
+                        <span className="ml-2 text-xs font-medium text-[var(--accent)]">
+                          Current
                         </span>
                       )}
                     </div>
@@ -438,7 +612,7 @@ export default function ManageListsDrawer({
                   </button>
 
                   {/* Actions: Share + Delete/Unsubscribe via ListActions */}
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="drawer-list-actions flex shrink-0 items-center gap-0.5">
                     {/* Rename (owners only) */}
                     {isOwner(list) &&
                       (renamingId === list.id ? (
@@ -498,10 +672,10 @@ export default function ManageListsDrawer({
                           type="button"
                           disabled={busy || creating || renaming}
                           onClick={() => startRename(list)}
-                          className="text-sm px-2 py-1 hover:bg-gray-100"
+                          className="app-icon-button"
                           title="Rename list"
                         >
-                          <FaPencilAlt className="w-5 h-5" />
+                          <FaPencilAlt className="size-4" />
                         </button>
                       ))}
 

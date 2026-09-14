@@ -1,0 +1,90 @@
+   ▲ Next.js 15.4.8 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.56.1:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1904ms
+ ○ Compiling / ...
+ ✓ Compiled / in 3.4s
+ GET / 200 in 4078ms
+ GET / 200 in 402ms
+ ✓ Compiled /favicon.ico in 267ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 572ms
+ GET / 200 in 94ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 291ms
+ ✓ Compiled in 57ms
+ ✓ Compiled in 151ms
+ ✓ Compiled in 81ms
+ ✓ Compiled in 62ms
+ ✓ Compiled in 110ms
+ ✓ Compiled in 38ms
+ GET / 200 in 438ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 298ms
+ GET / 200 in 80ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 293ms
+ ✓ Compiled /account in 287ms
+ GET /account 200 in 352ms
+ ✓ Compiled in 64ms
+ GET / 200 in 84ms
+ ✓ Compiled in 199ms
+ ✓ Compiled in 185ms
+ ✓ Compiled in 171ms
+ ✓ Compiled in 174ms
+ ✓ Compiled in 173ms
+ ✓ Compiled in 207ms
+ ✓ Compiled in 145ms
+ ✓ Compiled in 170ms
+ ✓ Compiled in 164ms
+ ✓ Compiled in 155ms
+ ✓ Compiled in 162ms
+ ✓ Compiled in 159ms
+ ✓ Compiled in 160ms
+ ✓ Compiled in 173ms
+ ✓ Compiled in 131ms
+ ✓ Compiled in 186ms
+ ✓ Compiled in 151ms
+ ✓ Compiled in 167ms
+ ✓ Compiled in 172ms
+ ✓ Compiled in 159ms
+ ✓ Compiled in 122ms
+ ✓ Compiled in 126ms
+ ✓ Compiled in 146ms
+ GET / 200 in 116ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 315ms
+ ✓ Compiled in 151ms
+ ✓ Compiled in 149ms
+ ✓ Compiled in 177ms
+ ✓ Compiled in 157ms
+ ✓ Compiled in 162ms
+ ✓ Compiled in 156ms
+ ✓ Compiled in 153ms
+ ✓ Compiled in 167ms
+ ✓ Compiled in 176ms
+ ✓ Compiled in 163ms
+ ✓ Compiled in 157ms
+ ✓ Compiled in 131ms
+ ✓ Compiled in 76ms
+ GET /account 200 in 192ms
+ GET / 200 in 174ms
+ ✓ Compiled in 116ms
+ ✓ Compiled in 200ms
+ ✓ Compiled in 387ms
+ GET / 200 in 676ms
+ ✓ Compiled in 162ms
+ ✓ Compiled in 219ms
+ GET / 200 in 355ms
+ GET / 200 in 185ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 395ms
+ GET / 200 in 164ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 346ms
+ ✓ Compiled in 105ms
+ GET / 200 in 521ms
+ GET / 200 in 171ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 356ms
+ ✓ Compiled in 104ms
+ GET / 200 in 670ms
+ GET / 200 in 183ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 404ms
+ GET / 200 in 177ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 373ms

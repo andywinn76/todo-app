@@ -19,7 +19,7 @@ export default function RootLayout({ children }) {
         <link rel="icon" href="/icons/icon-192x192.png" />
       </head>
       <body>
-      <div className="mx-auto max-w-[800px] border border-gray-300">
+      <div className="app-shell mx-auto max-w-[960px]">
         <Suspense fallback={null}>
           <AuthProvider>
             <ListsProvider>

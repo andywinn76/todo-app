@@ -1,9 +1,9 @@
 "use client";
 
-import { memo, useMemo, useCallback } from "react";
+import { memo, useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { FaGripVertical, FaPencilAlt } from "react-icons/fa";
-import DeleteIconButton from "./DeleteIconButton";
+import { MoreHorizontal } from "lucide-react";
 
 function TodoItem({
   todo,
@@ -16,6 +16,23 @@ function TodoItem({
   dragging = false,
   busy = false,
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnOutside = (event) => {
+      if (!menuRef.current?.contains(event.target)) setMenuOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen]);
   const progressColor = useMemo(() => {
     if (todo.progress == null) return null;
     const h = Math.min(120, Math.max(0, todo.progress * 1.2));
@@ -39,15 +56,15 @@ function TodoItem({
   return (
     <li
       data-todo-id={todo.id}
-      className={`flex items-start gap-2 border-b-1 border-slate-300 bg-white p-2 shadow-sm transition ${
-        dragging ? "relative z-10 scale-[1.01] bg-blue-50 shadow-md ring-2 ring-blue-400" : ""
+      className={`todo-row group relative flex items-start gap-2 transition ${
+        dragging ? "z-10 scale-[1.01] shadow-md ring-2 ring-[var(--accent)]" : ""
       } ${
         todo.completed && !dragging ? "opacity-60" : ""
       }`}
     >
       <button
         type="button"
-        className="mt-0.5 -ml-1 flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
+        className="mt-0.5 -ml-1 flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded text-stone-400 hover:bg-stone-100 hover:text-stone-700 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
         onPointerDown={(event) => onDragStart?.(event, todo.id)}
         disabled={!reorderEnabled}
         aria-label={`Reorder ${todo.title}`}
@@ -58,7 +75,7 @@ function TodoItem({
 
       <input
         type="checkbox"
-        className="mt-1 size-4"
+        className="mt-1 size-4 accent-[var(--accent)]"
         checked={!!todo.completed}
         disabled={busy}
         onChange={(e) => onToggle?.(e.target.checked)}
@@ -136,22 +153,28 @@ function TodoItem({
         </div>
       </div>
 
-      {/* Edit + Delete */}
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="relative shrink-0" ref={menuRef}>
         <button
           type="button"
-          className="text-blue-600 hover:text-blue-700 p-1"
+          className="todo-row-menu-trigger flex size-8 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
           disabled={busy}
-          onClick={() => onEdit?.(todo)}
-          title="Edit item"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-label={`Actions for ${todo.title}`}
+          aria-expanded={menuOpen}
         >
-          <FaPencilAlt className="w-5 h-5" />
+          <MoreHorizontal className="size-5" />
         </button>
-
-        <DeleteIconButton
-          onClick={() => onDelete?.()}
-          disabled={busy}
-        />
+        {menuOpen && (
+          <div className="todo-row-menu absolute right-0 top-full z-20 mt-1 w-36 rounded-xl border border-stone-200 bg-white p-1 shadow-lg">
+            <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100" onClick={() => { setMenuOpen(false); onEdit?.(todo); }}>
+              <FaPencilAlt className="size-3" /> Edit
+            </button>
+            <div className="my-1 border-t border-stone-100" />
+            <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50" onClick={() => { setMenuOpen(false); onDelete?.(); }}>
+              Delete
+            </button>
+          </div>
+        )}
       </div>
     </li>
   );

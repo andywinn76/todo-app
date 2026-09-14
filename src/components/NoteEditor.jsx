@@ -82,8 +82,8 @@ function ToolbarBtn({ onClick, active = false, title, disabled = false, children
       }}
       className={`rounded p-1.5 transition-colors disabled:opacity-40 ${
         active
-          ? "bg-blue-100 text-blue-700"
-          : "text-gray-600 hover:bg-gray-100"
+          ? "bg-[#e6efea] text-[var(--accent)]"
+          : "text-stone-600 hover:bg-stone-100"
       }`}
     >
       {children}
@@ -238,7 +238,7 @@ export default function NoteEditor({ user, listId }) {
     editorProps: {
       attributes: {
         class:
-          "note-editor-content outline-none px-4 py-3 min-h-[300px] leading-7",
+          "note-editor-content outline-none px-5 py-5 min-h-[300px] leading-7",
       },
     },
     onUpdate: ({ editor }) => {
@@ -426,15 +426,15 @@ export default function NoteEditor({ user, listId }) {
   // ----- render -------------------------------------------------------------
 
   return (
-    <section className="flex min-h-[100dvh] flex-col gap-3">
+    <section className="flex min-h-[75dvh] flex-col gap-3">
       {/* Editor card */}
-      <div className="flex-1 flex flex-col border rounded shadow-sm">
+      <div className="flex-1 flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white">
 
         {/* ── Sticky toolbar + link bar wrapper ── */}
         <div className="sticky top-0 z-10 rounded-t">
 
         {/* ── Toolbar ── */}
-        <div className="flex items-center gap-0.5 flex-wrap p-1.5 border-b bg-gray-50 rounded-t">
+        <div className="flex items-center gap-0.5 flex-wrap p-2 border-b border-stone-200 bg-[#fbfcf9] rounded-t">
 
           {/* Bold / Italic / Underline */}
           <ToolbarBtn
@@ -642,12 +642,12 @@ export default function NoteEditor({ user, listId }) {
       </div>
 
       {/* ── Sticky footer ── */}
-      <div className="sticky bottom-0 bg-white/90 backdrop-blur border-t py-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+      <div className="sticky bottom-0 bg-[var(--surface)]/90 backdrop-blur border-t border-stone-200 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
         <div className="text-sm text-gray-500 mb-2">{subtitle}</div>
         <button
           type="button"
           onClick={saveNow}
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-lg bg-[var(--accent)] px-4 py-2 text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
           disabled={saving || !isReady}
         >
           {saving ? "Saving…" : "Save"}

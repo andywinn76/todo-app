@@ -169,71 +169,79 @@ export default function AccountPage() {
   }
 
   return (
-    <main className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-6">Account</h1>
+    <main className="mx-auto max-w-3xl px-5 py-8 sm:px-8 sm:py-10">
+      <div className="mb-7 border-b border-stone-200 pb-5">
+        <h1 className="text-[1.65rem] font-semibold tracking-tight text-stone-900">Account</h1>
+        <p className="mt-1 text-sm text-stone-500">Manage your profile and invitations.</p>
+      </div>
 
-      <form onSubmit={handleSave} className="space-y-6">
+      <form onSubmit={handleSave} className="space-y-6 rounded-xl border border-stone-200 bg-white p-5 sm:p-6">
+        <h2 className="text-base font-semibold text-stone-900">Profile details</h2>
         <div>
-          <label className="block text-sm font-medium mb-1">Email</label>
+          <label htmlFor="account-email" className="mb-1.5 block text-sm font-medium text-stone-700">Email</label>
           <input
+            id="account-email"
             value={email}
             readOnly
-            className="w-full rounded border px-3 py-2 bg-gray-50 text-gray-600"
+            className="app-input w-full bg-stone-50 px-3 py-2.5 text-sm text-stone-500"
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Email is managed by Supabase Auth.
+          <p className="mt-1.5 text-xs text-stone-500">
+            Your email address can’t be changed here.
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">First name</label>
+            <label htmlFor="account-first-name" className="mb-1.5 block text-sm font-medium text-stone-700">First name</label>
             <input
+              id="account-first-name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="w-full rounded border px-3 py-2"
+              className="app-input w-full px-3 py-2.5 text-sm"
               placeholder="Andy"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Last name</label>
+            <label htmlFor="account-last-name" className="mb-1.5 block text-sm font-medium text-stone-700">Last name</label>
             <input
+              id="account-last-name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="w-full rounded border px-3 py-2"
+              className="app-input w-full px-3 py-2.5 text-sm"
               placeholder="Winn"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Username</label>
+          <label htmlFor="account-username" className="mb-1.5 block text-sm font-medium text-stone-700">Username</label>
           <input
+            id="account-username"
             value={username ?? ""}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full rounded border px-3 py-2"
+            className="app-input w-full px-3 py-2.5 text-sm"
             placeholder="username"
             pattern="^[A-Za-z0-9_]{3,20}$"
             minLength={3}
             maxLength={20}
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Unique username, 3 to 30 characters: letters, numbers, and
+          <p className="mt-1.5 text-xs text-stone-500">
+            Unique username, 3 to 20 characters: letters, numbers, and
             underscores are allowed.
           </p>
         </div>
 
         {/* Avatar upload coming later */}
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label className="mb-1.5 block text-sm font-medium text-stone-700">
             Avatar (coming soon)
           </label>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gray-200" />
+            <div className="size-12 rounded-full bg-[#e9efeb]" />
             <button
               type="button"
               disabled
-              className="rounded px-3 py-2 border text-sm text-gray-400 cursor-not-allowed"
+              className="cursor-not-allowed rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-400"
               title="Coming soon"
             >
               Upload…
@@ -241,11 +249,11 @@ export default function AccountPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 border-t border-stone-100 pt-5">
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 disabled:opacity-50"
+            className="rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save changes"}
           </button>
@@ -253,30 +261,31 @@ export default function AccountPage() {
           <button
             type="button"
             onClick={handleSendResetEmail}
-            className="rounded border px-4 py-2"
+            className="rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
           >
             Send password reset email
           </button>
         </div>
       </form>
 
-      <div className="mt-6 border-t pt-4">
-        <h2 className="text-lg font-semibold mb-4">Invites</h2>
-        <div className="flex gap-3">
+      <section className="mt-5 rounded-xl border border-stone-200 bg-white p-5 sm:p-6">
+        <h2 className="text-base font-semibold text-stone-900">Invites</h2>
+        <p className="mt-1 text-sm text-stone-500">Invite people to collaborate or review invitations.</p>
+        <div className="mt-4 flex flex-wrap gap-3">
           <Link
             href="/invite"
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+            className="rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
           >
             Send Invites
           </Link>
           <Link
             href="/invite/manage"
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+            className="rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
           >
             Manage Invites
           </Link>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

@@ -112,9 +112,9 @@ export default function Home() {
   if (!user || userLoading) return <p className="p-6">Loading...</p>;
 
   return (
-    <main className="px-4 sm:px-6 py-6">
+    <main className="px-5 py-7 sm:px-8 sm:py-9">
       {/* Header row */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b border-stone-200 pb-6 sm:gap-4">
         {/* LEFT */}
         <div className="min-w-0 flex-1">
           <div className="min-w-0 flex items-center gap-2">
@@ -146,16 +146,16 @@ export default function Home() {
         </div>
 
         {/* RIGHT */}
-        <div className="shrink-0 flex items-center gap-2">
+        <div className="list-header-actions shrink-0 flex items-center gap-2">
           {/* Search button — always visible */}
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
             aria-label="Search"
             title="Search (⌘K)"
-            className="inline-flex items-center justify-center rounded p-1.5 hover:bg-gray-100"
+            className="app-icon-button"
           >
-            <Search className="w-5 h-5 text-gray-600" />
+            <Search className="size-5" />
           </button>
 
           {/* Per-list actions */}
@@ -192,10 +192,10 @@ export default function Home() {
           {hasValidActive && cfg.supportsAdd && (
             <button
               onClick={() => setAddOpen((v) => !v)}
-              className={`rounded w-9 h-9 flex items-center justify-center font-bold text-xl leading-none border ${
+              className={`flex size-9 items-center justify-center rounded-lg text-xl font-semibold leading-none transition ${
                 addOpen
-                  ? "bg-gray-200 hover:bg-gray-300"
-                  : "bg-green-500 hover:bg-green-600 text-white"
+                  ? "bg-stone-100 text-stone-700 hover:bg-stone-200"
+                  : "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
               }`}
               aria-expanded={addOpen}
               aria-label={addOpen ? "Cancel" : cfg.addLabel || "Add"}
@@ -249,6 +249,7 @@ export default function Home() {
       <ManageListsDrawer
         open={manageOpen}
         onClose={() => setManageOpen(false)}
+        onOpenSearch={() => setSearchOpen(true)}
         user={user}
         lists={lists}
         triggerRef={{ current: null }}

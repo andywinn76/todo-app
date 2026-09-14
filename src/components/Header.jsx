@@ -37,7 +37,7 @@ export default function Header({ children }) {
   };
 
   return (
-    <header className="flex items-center justify-between bg-gray-100 p-4 border-b">
+    <header className="app-header flex items-center justify-between px-5 py-4 sm:px-8">
       <Link href="/" aria-label="Go to home page" title="Go to home page">
         <Logo
           type="responsive"
@@ -61,8 +61,8 @@ export default function Header({ children }) {
           }}
         />
         {/* Welcome message and user initials */}
-        <h1 className="text-base md:text-lg lg:text-xl font-semibold mr-2 md:mr-5">
-          Welcome, {firstName || "User"}!
+        <h1 className="hidden text-sm font-medium text-stone-600 sm:block md:mr-3">
+          Hi, {firstName || "User"}
         </h1>
         {/* Avatar with user initials */}
         <Link
@@ -71,7 +71,7 @@ export default function Header({ children }) {
           title="Open account page"
           className="group rounded-full outline-none"
         >
-          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg ring-0 group-focus-visible:ring-2 group-focus-visible:ring-blue-600 cursor-pointer">
+          <div className="flex size-9 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-white ring-0 group-focus-visible:ring-2 group-focus-visible:ring-[var(--accent)] cursor-pointer">
             {initials}
           </div>
         </Link>

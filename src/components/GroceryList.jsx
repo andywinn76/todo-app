@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import { toast } from "sonner";
+import { FaGripVertical } from "react-icons/fa";
 import DeleteIconButton from "@/components/DeleteIconButton";
 import {
   fetchGroceries,
   insertGrocery,
   setGroceryChecked,
   deleteGrocery as deleteGroceryApi,
+  reorderGroceries,
 } from "@/lib/groceries";
 
 /**
@@ -20,6 +22,10 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sortOrder, setSortOrder] = useState("custom");
+  const [supportsPosition, setSupportsPosition] = useState(false);
+  const [draggingId, setDraggingId] = useState(null);
+  const dragRef = useRef(null);
 
   // Track in-flight operations per item id
   const [busyIds, setBusyIds] = useState(() => new Set());
@@ -53,7 +59,7 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
       return;
     }
     setLoading(true);
-    const { data, error } = await fetchGroceries(listId);
+    const { data, error, supportsPosition: hasPosition } = await fetchGroceries(listId);
     setLoading(false);
 
     if (error) {
@@ -63,7 +69,10 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
       return;
     }
     setItems(data);
+    setSupportsPosition(hasPosition);
   }, [listId]);
+
+  useEffect(() => setSortOrder("custom"), [listId]);
 
   // Initial load + reload when list/user changes
   useEffect(() => {
@@ -89,6 +98,13 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
 
       const trimmed = (name || "").trim();
       if (!trimmed) return toast.error("Enter an item name");
+      const submittedQuantity = quantity || null;
+
+      // Keep focus in the name field during the async save. Waiting until the
+      // request finishes can prevent mobile browsers from reopening the keyboard.
+      setName("");
+      setQuantity("");
+      inputRef.current?.focus();
 
       // Optimistically insert a temp row
       const tempId = `temp-${Date.now()}`;
@@ -96,7 +112,7 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
         id: tempId,
         list_id: String(listId),
         name: trimmed,
-        quantity: quantity || null,
+        quantity: submittedQuantity,
         is_checked: false,
         created_at: new Date().toISOString(),
       };
@@ -106,7 +122,7 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
       const { data, error } = await insertGrocery({
         list_id: listId,
         name: trimmed,
-        quantity: quantity || null,
+        quantity: submittedQuantity,
       });
 
       setSaving(false);
@@ -114,6 +130,8 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
       if (error) {
         // Remove temp and report
         setItems((prev) => prev.filter((i) => i.id !== tempId));
+        setName((current) => current || trimmed);
+        setQuantity((current) => current || submittedQuantity || "");
         console.error(error);
         return toast.error("Failed to add item");
       }
@@ -121,10 +139,6 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
       // Replace temp with real row
       setItems((prev) => prev.map((i) => (i.id === tempId ? data : i)));
 
-      // Clear + refocus
-      setName("");
-      setQuantity("");
-      setTimeout(() => inputRef.current?.focus(), 0);
     },
     [saving, name, quantity, listId]
   );
@@ -183,14 +197,75 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
     [items]
   );
 
+  const displayedItems = useMemo(() => {
+    if (sortOrder === "custom") return items;
+    return [...items].sort((a, b) => {
+      const comparison = (a.name || "").localeCompare(b.name || "", undefined, {
+        sensitivity: "base",
+        numeric: true,
+      });
+      return sortOrder === "az" ? comparison : -comparison;
+    });
+  }, [items, sortOrder]);
+
+  const handleDragStart = useCallback((event, id) => {
+    if (event.button !== 0 || sortOrder !== "custom" || busyIds.has(id)) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = { id, original: items, latest: items };
+    setDraggingId(id);
+
+    const handleMove = (moveEvent) => {
+      if (moveEvent.clientY < 80) window.scrollBy({ top: -12, behavior: "auto" });
+      else if (moveEvent.clientY > window.innerHeight - 80) {
+        window.scrollBy({ top: 12, behavior: "auto" });
+      }
+
+      const targetId = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)
+        ?.closest("[data-grocery-id]")?.dataset.groceryId;
+      if (!targetId || targetId === String(id)) return;
+
+      setItems((current) => {
+        const from = current.findIndex((item) => String(item.id) === String(id));
+        const to = current.findIndex((item) => String(item.id) === targetId);
+        if (from < 0 || to < 0 || from === to) return current;
+        const next = current.slice();
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        dragRef.current.latest = next;
+        return next;
+      });
+    };
+
+    const handleEnd = async () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleEnd);
+      window.removeEventListener("pointercancel", handleEnd);
+      const drag = dragRef.current;
+      dragRef.current = null;
+      setDraggingId(null);
+      if (!drag || drag.latest === drag.original) return;
+      const { error } = await reorderGroceries(listId, drag.latest, supportsPosition);
+      if (error) {
+        console.error("Error saving grocery order:", error);
+        setItems(drag.original);
+        toast.error("Couldn’t save the new order.");
+      }
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleEnd, { once: true });
+    window.addEventListener("pointercancel", handleEnd, { once: true });
+  }, [busyIds, items, listId, sortOrder, supportsPosition]);
+
   return (
-    <section className="space-y-2">
+    <section className="space-y-3 pt-1">
       {!isControlled && !showForm && (
         <div className="flex justify-start">
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="px-4 py-1 rounded border hover:bg-gray-50"
+            className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
           >
             Add items
           </button>
@@ -207,7 +282,7 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
         <div className="overflow-hidden">
           <form
             onSubmit={addItem}
-            className="flex flex-col sm:flex-row gap-2 bg-white p-4"
+            className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-[#f8faf7] p-4 sm:flex-row"
             onKeyDown={(e) => {
               if (e.key === "Escape") setShowForm(false);
             }}
@@ -218,8 +293,7 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
               placeholder="Add item (e.g., milk)"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="flex-1 border rounded px-3 py-2"
-              readOnly={saving}
+              className="app-input min-w-0 flex-1 px-3 py-2 text-sm"
               autoFocus
             />
             <input
@@ -227,25 +301,20 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
               placeholder="Qty (optional)"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
-              className="w-full sm:w-40 border rounded px-3 py-2"
-              readOnly={saving}
+              className="app-input w-full px-3 py-2 text-sm sm:w-40"
             />
             <div className="flex gap-2">
               <button
                 type="submit"
                 disabled={saving || !name.trim()}
-                className={`px-4 py-1 rounded font-semibold ${
-                  saving
-                    ? "opacity-70 cursor-not-allowed"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                }`}
+                className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {saving ? "Adding…" : "Add"}
               </button>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="px-4 py-1 rounded border hover:bg-gray-50 text-sm"
+                className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
               >
                 Close
               </button>
@@ -254,19 +323,37 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
         </div>
       </div>
 
-      <div className="text-sm text-gray-600">Remaining: {uncheckedCount}</div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-stone-500">{uncheckedCount} remaining</p>
+        <label className="flex items-center gap-2 text-sm text-stone-500">
+          <span>Sort by</span>
+          <select
+            value={sortOrder}
+            onChange={(event) => setSortOrder(event.target.value)}
+            className="app-select"
+            aria-label="Sort grocery items"
+          >
+            <option value="custom">Custom order</option>
+            <option value="az">A–Z</option>
+            <option value="za">Z–A</option>
+          </select>
+        </label>
+      </div>
 
       {loading ? (
         <div>Loading…</div>
       ) : items.length === 0 ? (
         <div className="text-gray-700 text-xl">No items yet.</div>
       ) : (
-        <ul className="space-y-2">
-          {items.map((item) => (
+        <ul className="todo-list-surface">
+          {displayedItems.map((item) => (
             <GroceryRow
               key={item.id}
               item={item}
               busy={busyIds.has(item.id)}
+              dragging={draggingId === item.id}
+              reorderEnabled={sortOrder === "custom"}
+              onDragStart={(event) => handleDragStart(event, item.id)}
               onToggle={() => toggle(item.id, item.is_checked)}
               onDelete={() => remove(item.id)}
             />
@@ -278,24 +365,36 @@ export default function GroceryList({ user, listId, open, onOpenChange }) {
 }
 
 /** Memoized row so other rows don’t re-render on each toggle/delete */
-const GroceryRow = memo(function GroceryRow({ item, onToggle, onDelete, busy }) {
+const GroceryRow = memo(function GroceryRow({ item, onToggle, onDelete, onDragStart, reorderEnabled, dragging, busy }) {
   return (
     <li
-      className={`p-2 border rounded flex items-center gap-3 ${
-        item.is_checked ? "bg-green-50" : "bg-white"
+      data-grocery-id={item.id}
+      className={`todo-row group relative flex items-center gap-2 transition ${
+        dragging ? "z-10 scale-[1.01] shadow-md ring-2 ring-[var(--accent)]" : ""
       }`}
     >
+      <button
+        type="button"
+        className="-ml-1 flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded text-stone-400 hover:bg-stone-100 hover:text-stone-700 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
+        onPointerDown={onDragStart}
+        disabled={!reorderEnabled || busy}
+        aria-label={`Reorder ${item.name}`}
+        title={reorderEnabled ? "Drag to reorder" : "Choose Custom order to drag items"}
+      >
+        <FaGripVertical className="size-4" aria-hidden="true" />
+      </button>
       <input
         type="checkbox"
         checked={item.is_checked}
         onChange={onToggle}
         aria-label={item.is_checked ? "Uncheck item" : "Check item"}
         disabled={busy}
+        className="size-4 shrink-0 accent-[var(--accent)]"
       />
       <div className="flex-1 min-w-0">
         <span
           className={`truncate ${
-            item.is_checked ? "line-through text-gray-500" : ""
+            item.is_checked ? "line-through text-stone-400" : "font-medium text-stone-800"
           }`}
           title={item.name}
         >
@@ -310,6 +409,7 @@ const GroceryRow = memo(function GroceryRow({ item, onToggle, onDelete, busy }) 
         disabled={busy}
         title="Delete item"
         aria-label="Delete item"
+        className="grocery-delete-button"
       />
     </li>
   );
