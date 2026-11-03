@@ -9,7 +9,7 @@ import { LIST_TYPE_DEFAULTS } from "@/utils/listTypes";
 
 const PRIORITIES = ["low", "medium", "high"];
 
-export default function TodoForm({ onCreated }) {
+export default function TodoForm({ onCreated, onClose }) {
   const { lists, activeListId } = useLists();
   const titleRef = useRef(null);
 
@@ -72,6 +72,17 @@ export default function TodoForm({ onCreated }) {
     }, 0);
     return () => clearTimeout(t);
   }, [activeListId, busy]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose?.();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -277,7 +288,8 @@ export default function TodoForm({ onCreated }) {
           />
         )}
 
-        {/* Submit – always at the bottom */}
+        {/* Form actions */}
+        <div className="flex items-center gap-2">
         <button
           type="submit"
           disabled={!activeListId || busy}
@@ -285,6 +297,16 @@ export default function TodoForm({ onCreated }) {
         >
           {busy ? "Adding..." : "Add"}
         </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close add todo form"
+            title="Close (Esc)"
+            className="rounded border border-stone-300 bg-stone-100 px-4 py-2 font-medium text-stone-700 shadow-sm transition-colors hover:bg-stone-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-500"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </form>
   );

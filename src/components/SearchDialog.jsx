@@ -55,12 +55,13 @@ export default function SearchDialog({ open, onClose }) {
 
     setLoading(true);
     const pattern = `%${trimmed}%`;
+    const quotedPattern = `"${pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
-    const [todosRes, notesRes, groceriesRes] = await Promise.all([
+    const [todosRes, notesRes, groceriesRes, listsRes] = await Promise.all([
       supabase
         .from("todos")
         .select("id, title, description, list_id, lists(id, name, type)")
-        .ilike("title", pattern)
+        .or(`title.ilike.${quotedPattern},description.ilike.${quotedPattern}`)
         .limit(15),
       supabase
         .from("notes")
@@ -70,6 +71,11 @@ export default function SearchDialog({ open, onClose }) {
       supabase
         .from("grocery_items")
         .select("id, name, list_id, lists(id, name, type)")
+        .ilike("name", pattern)
+        .limit(15),
+      supabase
+        .from("lists")
+        .select("id, name, type")
         .ilike("name", pattern)
         .limit(15),
     ]);
@@ -117,6 +123,21 @@ export default function SearchDialog({ open, onClose }) {
         label: g.name,
         snippet: null,
         kind: "grocery",
+      });
+    });
+
+    // Notes use their list name as their title. Include matching list names
+    // even when no item body matches, or the list has no items yet.
+    (listsRes.data || []).forEach((list) => {
+      if (hits.some((hit) => hit.listId === list.id)) return;
+      hits.push({
+        id: `list-${list.id}`,
+        listId: list.id,
+        listName: list.name,
+        listType: list.type,
+        label: list.name,
+        snippet: null,
+        kind: list.type,
       });
     });
 

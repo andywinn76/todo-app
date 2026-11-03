@@ -55,6 +55,7 @@ export default function ManageListsDrawer({
   const [creating, setCreating] = useState(false);
 
   const panelRef = useRef(null);
+  const sortFilterRef = useRef(null);
   const focusStartRef = useRef(null);
   const createInputRef = useRef(null);
 
@@ -72,6 +73,24 @@ export default function ManageListsDrawer({
   const dragRef = useRef(null);
   const listScrollRef = useRef(null);
   const orderKey = user ? `list-order:${user.id}` : null;
+
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const saved = localStorage.getItem(`list-sort:${user.id}`);
+      setSortOrder(["custom", "az", "za", "dateAsc", "dateDesc"].includes(saved) ? saved : "custom");
+    } catch {
+      setSortOrder("custom");
+    }
+  }, [user?.id]);
+
+  function changeSortOrder(value) {
+    setSortOrder(value);
+    if (!user?.id) return;
+    try {
+      localStorage.setItem(`list-sort:${user.id}`, value);
+    } catch {}
+  }
 
   //Renaming lists state
   const [renamingId, setRenamingId] = useState(null);
@@ -123,7 +142,7 @@ export default function ManageListsDrawer({
         const selectors =
           'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
         const focusables = Array.from(root.querySelectorAll(selectors)).filter(
-          (el) => !el.hasAttribute("disabled") && el.tabIndex !== -1
+          (el) => !el.hasAttribute("disabled") && el.tabIndex !== -1 && el.getClientRects().length > 0
         );
         if (!focusables.length) return;
         const first = focusables[0];
@@ -153,6 +172,7 @@ export default function ManageListsDrawer({
 
   useEffect(() => {
     if (!open) return;
+    if (sortFilterRef.current) sortFilterRef.current.open = false;
     setShowCreateForm(false);
     setCreatedThisSession(false);
     setNewName("");
@@ -219,6 +239,13 @@ export default function ManageListsDrawer({
     );
     if (sortOrder !== "custom") {
       return filtered.sort((a, b) => {
+        if (sortOrder === "dateAsc" || sortOrder === "dateDesc") {
+          const dateA = Date.parse(a.created_at);
+          const dateB = Date.parse(b.created_at);
+          if (!Number.isFinite(dateA)) return Number.isFinite(dateB) ? 1 : 0;
+          if (!Number.isFinite(dateB)) return -1;
+          return sortOrder === "dateAsc" ? dateA - dateB : dateB - dateA;
+        }
         const comparison = (optimisticNames[a.id] ?? a.name ?? "").localeCompare(
           optimisticNames[b.id] ?? b.name ?? "", undefined,
           { sensitivity: "base", numeric: true }
@@ -442,18 +469,6 @@ export default function ManageListsDrawer({
           </div>
         </div>
 
-        {/* Search / filter */}
-        <div className="relative mb-5">
-          <Search className="list-filter-icon pointer-events-none absolute top-1/2 size-4 -translate-y-1/2 text-stone-400" aria-hidden="true" />
-          <input
-            type="text"
-            value={filterQuery}
-            onChange={(e) => setFilterQuery(e.target.value)}
-            placeholder="Filter lists…"
-            className="app-input list-filter-input w-full pr-3 py-2.5 text-sm"
-          />
-        </div>
-
         <button
           type="button"
           onClick={() => {
@@ -521,23 +536,46 @@ export default function ManageListsDrawer({
           </form>
         )}
 
+        <details ref={sortFilterRef} className="group mb-3 shrink-0 rounded-xl border border-stone-200 bg-stone-50">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-medium text-stone-700 [&::-webkit-details-marker]:hidden">
+            Sort and filter
+            <span aria-hidden="true" className="transition-transform group-open:rotate-180">⌄</span>
+          </summary>
+          <div className="border-t border-stone-200 px-3 pt-3">
+        {/* Search / filter */}
+        <div className="relative mb-5">
+          <Search className="list-filter-icon pointer-events-none absolute top-1/2 size-4 -translate-y-1/2 text-stone-400" aria-hidden="true" />
+          <input
+            type="text"
+            value={filterQuery}
+            onChange={(e) => setFilterQuery(e.target.value)}
+            placeholder="Filter lists…"
+            className="app-input list-filter-input w-full pr-3 py-2.5 text-sm"
+          />
+        </div>
+
         <div className="mb-3 flex items-center justify-between gap-3">
-          <span className="text-sm font-medium text-stone-500">{lists.length} lists</span>
+
           <label className="flex items-center gap-2 text-sm text-stone-500">
             <span>Sort by</span>
             <select
               value={sortOrder}
-              onChange={(event) => setSortOrder(event.target.value)}
+              onChange={(event) => changeSortOrder(event.target.value)}
               className="app-select"
               aria-label="Sort lists"
             >
               <option value="custom">Custom order</option>
               <option value="az">A–Z</option>
               <option value="za">Z–A</option>
+              <option value="dateAsc">Date ascending (oldest first)</option>
+              <option value="dateDesc">Date descending (newest first)</option>
             </select>
           </label>
         </div>
 
+          </div>
+        </details>
+        <div className="mb-3 text-sm font-medium text-stone-500">{lists.length} lists</div>
         {/* Existing lists */}
         <div ref={listScrollRef} className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 pb-2">
           {lists.length === 0 && (

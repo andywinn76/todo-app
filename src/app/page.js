@@ -188,21 +188,21 @@ export default function Home() {
             </>
           )}
 
-          {/* Add / Cancel button */}
-          {hasValidActive && cfg.supportsAdd && (
+          {/* Add button */}
+          {hasValidActive && cfg.supportsAdd && !addOpen && (
             <button
-              onClick={() => setAddOpen((v) => !v)}
+              onClick={() => setAddOpen(true)}
               className={`flex size-9 items-center justify-center rounded-lg text-xl font-semibold leading-none transition ${
                 addOpen
                   ? "bg-stone-100 text-stone-700 hover:bg-stone-200"
                   : "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
               }`}
               aria-expanded={addOpen}
-              aria-label={addOpen ? "Cancel" : cfg.addLabel || "Add"}
-              title={addOpen ? "Cancel" : cfg.addLabel || "Add"}
+              aria-label={cfg.addLabel || "Add"}
+              title={cfg.addLabel || "Add"}
               type="button"
             >
-              {addOpen ? "×" : "+"}
+              +
             </button>
           )}
         </div>
@@ -220,10 +220,9 @@ export default function Home() {
               user={user}
               onCreated={(row) => {
                 setLastCreated(row);
-                setAddOpen(false);
               }}
               isActive={addOpen}
-              setIsActive={setAddOpen}
+              onClose={() => setAddOpen(false)}
             />
           )}
           <TodoList lastCreated={lastCreated} />
