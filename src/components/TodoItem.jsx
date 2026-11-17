@@ -50,16 +50,18 @@ function TodoItem({
         onUpdate?.({ progress: next, completed: false });
       }
     },
-    [onUpdate]
+    [onUpdate],
   );
 
   return (
     <li
       data-todo-id={todo.id}
       className={`todo-row group relative flex items-start gap-2 transition ${
-        dragging ? "z-10 scale-[1.01] shadow-md ring-2 ring-[var(--accent)]" : ""
-      } ${
-        todo.completed && !dragging ? "opacity-60" : ""
+        dragging
+          ? "z-10 scale-[1.01] shadow-md ring-2 ring-[var(--accent)]"
+          : ""
+      } ${menuOpen ? "z-20" : ""} ${
+        todo.completed && !dragging && !menuOpen ? "opacity-60" : ""
       }`}
     >
       <button
@@ -68,7 +70,11 @@ function TodoItem({
         onPointerDown={(event) => onDragStart?.(event, todo.id)}
         disabled={!reorderEnabled}
         aria-label={`Reorder ${todo.title}`}
-        title={reorderEnabled ? "Drag to reorder" : "Choose Custom order to drag items"}
+        title={
+          reorderEnabled
+            ? "Drag to reorder"
+            : "Choose Custom order to drag items"
+        }
       >
         <FaGripVertical className="size-4" aria-hidden="true" />
       </button>
@@ -85,9 +91,7 @@ function TodoItem({
         <div className="flex items-center gap-2">
           <p
             className={`truncate font-medium ${
-              todo.completed
-                ? "line-through text-gray-500"
-                : "text-gray-900"
+              todo.completed ? "line-through text-gray-500" : "text-gray-900"
             }`}
           >
             {todo.title}
@@ -132,9 +136,7 @@ function TodoItem({
 
         <div className="mt-1 text-xs text-gray-500 flex items-center gap-3">
           {todo.due_date && (
-            <span>
-              Due {format(new Date(todo.due_date), "MMM d, yyyy")}
-            </span>
+            <span>Due {format(new Date(todo.due_date), "MMM d, yyyy")}</span>
           )}
 
           {todo.priority && (
@@ -143,8 +145,8 @@ function TodoItem({
                 todo.priority === "high"
                   ? "bg-red-100 text-red-700 ring-red-200"
                   : todo.priority === "medium"
-                  ? "bg-amber-100 text-amber-800 ring-amber-200"
-                  : "bg-gray-100 text-gray-700 ring-gray-200"
+                    ? "bg-amber-100 text-amber-800 ring-amber-200"
+                    : "bg-gray-100 text-gray-700 ring-gray-200"
               }`}
             >
               {todo.priority}
@@ -166,11 +168,25 @@ function TodoItem({
         </button>
         {menuOpen && (
           <div className="todo-row-menu absolute right-0 top-full z-20 mt-1 w-36 rounded-xl border border-stone-200 bg-white p-1 shadow-lg">
-            <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100" onClick={() => { setMenuOpen(false); onEdit?.(todo); }}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100"
+              onClick={() => {
+                setMenuOpen(false);
+                onEdit?.(todo);
+              }}
+            >
               <FaPencilAlt className="size-3" /> Edit
             </button>
             <div className="my-1 border-t border-stone-100" />
-            <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50" onClick={() => { setMenuOpen(false); onDelete?.(); }}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50"
+              onClick={() => {
+                setMenuOpen(false);
+                onDelete?.();
+              }}
+            >
               Delete
             </button>
           </div>

@@ -88,3 +88,12 @@
  GET /favicon.ico?favicon.f1dd271f.ico 200 in 404ms
  GET / 200 in 177ms
  GET /favicon.ico?favicon.f1dd271f.ico 200 in 373ms
+ GET / 200 in 98ms
+ GET / 200 in 90ms
+ GET / 200 in 108ms
+ GET /favicon.ico?favicon.f1dd271f.ico 200 in 307ms
+ GET / 200 in 211ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1212ms
+ GET /login 200 in 1327ms
+[?25h
