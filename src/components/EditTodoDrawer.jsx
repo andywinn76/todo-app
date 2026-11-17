@@ -36,6 +36,18 @@ export default function EditTodoDrawer({ todo, onClose, onSave }) {
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    function handleEscape(event) {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!saving) onClose?.();
+    }
+
+    document.addEventListener("keydown", handleEscape, true);
+    return () => document.removeEventListener("keydown", handleEscape, true);
+  }, [onClose, saving]);
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!title.trim()) return;
@@ -72,21 +84,19 @@ export default function EditTodoDrawer({ todo, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex">
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
       {/* Backdrop */}
       <button
         type="button"
         onClick={onClose}
-        className="flex-1 bg-black/30 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
         aria-label="Close edit panel"
       />
 
-      {/* Drawer */}
-      <div className="w-full max-w-md h-full bg-white shadow-2xl border-l
-                      transform transition-transform duration-300 ease-out translate-x-0
-                      flex flex-col">
+      {/* Dialog */}
+      <div role="dialog" aria-modal="true" aria-label="Edit item" className="relative flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-xl border bg-white shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="flex shrink-0 items-center justify-between px-4 py-3 border-b">
           <h2 className="text-lg font-semibold text-gray-800">Edit item</h2>
           <button
             type="button"
@@ -100,7 +110,7 @@ export default function EditTodoDrawer({ todo, onClose, onSave }) {
         {/* Body */}
         <form
           onSubmit={handleSubmit}
-          className="flex-1 overflow-y-auto px-4 py-3 space-y-4"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 space-y-4"
         >
           {/* Title */}
           <div>
